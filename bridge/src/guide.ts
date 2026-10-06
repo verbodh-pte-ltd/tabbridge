@@ -29,6 +29,17 @@ export class GuideRecorder {
     this.root = root;
   }
 
+  /** Typing in several pieces reads as one step: "Typed 12 characters" + "Typed 5" = "Typed 17". */
+  private note(action: string): void {
+    const typed = /^Typed (\d+) characters$/;
+    const last = this.actions.at(-1);
+    if (last && typed.test(last) && typed.test(action)) {
+      this.actions[this.actions.length - 1] = `Typed ${Number(last.match(typed)![1]) + Number(action.match(typed)![1])} characters`;
+    } else {
+      this.actions.push(action);
+    }
+  }
+
   setClient(client: string): void {
     this.client = client;
   }
@@ -45,7 +56,7 @@ export class GuideRecorder {
     if (tool === "gif_record" && args.action === "stop") return this.recording(args, result, content, meta);
     if (tool !== "screenshot") {
       const action = describe(tool, args, result);
-      if (action) this.actions.push(action);
+      if (action) this.note(action);
       return { ...result, content };
     }
     const image = content.find((c) => c.type === "image");
@@ -138,16 +149,17 @@ function describe(tool: string, args: Record<string, any>, result: ToolResult): 
   switch (tool) {
     case "navigate": return ["back", "forward", "reload"].includes(args.url) ? `Went ${args.url === "reload" ? "and reloaded the page" : args.url}` : `Opened ${args.url}`;
     case "tab_create": return args.url ? `Opened ${args.url} in a new tab` : "Opened a new tab";
-    case "click": return text.replace(/\.$/, "");
+    case "click": return text.replace(/\s*\.$/, "").replace(/\s+"/g, ' "').trim();
     case "type": return `Typed ${String(args.text ?? "").length} characters`;
     case "key": return `Pressed ${args.keys}`;
-    case "form_input": return `Filled in a field (${args.ref}) with ${typeof args.value === "boolean" ? (args.value ? "on" : "off") : `"${String(args.value).slice(0, 40)}"`}`;
+    case "form_input": return text.replace(/\s*\.$/, "").replace(/ \(e\d+\)/, "");
     case "scroll": return args.ref ? `Scrolled to ${args.ref}` : `Scrolled ${args.direction ?? "down"}`;
     case "tab_select": return `Switched to tab ${args.tabId}`;
     case "hover": return args.ref ? `Hovered over ${args.ref}` : `Hovered at ${args.x},${args.y}`;
     case "drag": return text.replace(/\.$/, "");
     case "file_upload": return `Attached ${(args.paths ?? []).map((p: string) => path.basename(p)).join(", ")}`;
     case "gif_record": return args.action === "start" ? "Started recording" : null;
+    case "page_report": return "Checked the page with page_report";
     case "resize_window": return `Resized the window to ${args.width}×${args.height}`;
     default: return null;   // reading tools change nothing on screen
   }

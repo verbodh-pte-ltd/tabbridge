@@ -80,3 +80,14 @@ test("a GIF recording is saved as a guide step and not sent back to the agent", 
   const readme = fs.readFileSync(path.join(root, folder, "README.md"), "utf8");
   assert.match(readme, /## Step 1: Next button flow\n\n- Started recording\n- Clicked button "Next"/);
 });
+
+test("typing in pieces becomes one line; fields are named by their label, not their ref", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tabbridge-guide-"));
+  const g = new GuideRecorder("x", root);
+  g.record("form_input", { ref: "e2", value: "Ada" }, text('Set "Name" (e2) to "Ada".'));
+  for (const piece of ["Invoice ", "0041 ", "twice."]) g.record("type", { text: piece }, text("Typed."));
+  g.record("screenshot", {}, shot("Form", "https://a.example"));
+  const [folder] = fs.readdirSync(root);
+  const readme = fs.readFileSync(path.join(root, folder, "README.md"), "utf8");
+  assert.match(readme, /- Set "Name" to "Ada"\n- Typed 19 characters\n\n/);
+});

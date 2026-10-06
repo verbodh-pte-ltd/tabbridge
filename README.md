@@ -5,6 +5,11 @@ speaks [MCP](https://modelcontextprotocol.io), can open pages, read them, click,
 screenshots and see what DevTools sees, in your normal browser with your sign-ins, and with your
 approval for anything risky.
 
+![An agent fills in and sends a form through TabBridge; the risky click is approved first](docs/demo.gif)
+
+Every screen of that run, as the step-by-step guide TabBridge writes by itself:
+[docs/demo-steps](docs/demo-steps/01-acme-support/README.md). Re-record with `node scripts/demo-gif.mjs`.
+
 TabBridge is only a bridge. It has no AI model and no API key: your agent does the thinking,
 TabBridge gives it hands in the browser.
 

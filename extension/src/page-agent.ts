@@ -248,6 +248,7 @@ interface Info {
   function formInput(ref: string, value: unknown): string {
     const el = byRef(ref);
     if (!el) return `No element ${ref} on the page any more. Call read_page or find for fresh refs.`;
+    const name = label(el) ? `"${label(el)}" (${ref})` : ref;
     (el as HTMLElement).focus?.();
     if (el instanceof HTMLSelectElement) {
       const want = String(value).toLowerCase();
@@ -257,7 +258,7 @@ interface Info {
     } else if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) {
       const want = value === true || value === "true" || value === "on" || value === 1;
       if (el.checked !== want) el.click();
-      return `${ref} is now ${el.checked ? "checked" : "unchecked"}.`;
+      return `${name} is now ${el.checked ? "checked" : "unchecked"}.`;
     } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
       setNative(el, String(value));
     } else {
@@ -265,7 +266,7 @@ interface Info {
     }
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
-    return `Set ${ref} to ${JSON.stringify(String(value))}.`;
+    return `Set ${name} to ${JSON.stringify(String(value))}.`;
   }
 
   function pageText(max: number): string {
