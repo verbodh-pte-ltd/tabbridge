@@ -23,7 +23,6 @@ await new Promise((r) => setTimeout(r, 800));
 const prompt = `Use the tabbridge tools: navigate to ${site.url("/second")} and read the page text. Reply with only the codeword on the page.`;
 
 // Windows: npm's .cmd wrappers can't take JSON arguments safely, so find the real executables.
-import fs from "node:fs";
 function exe(name) {
   if (process.platform !== "win32") return spawnSync("which", [name], { encoding: "utf8" }).status === 0 ? name : null;
   const npm = path.join(process.env.APPDATA ?? "", "npm");
