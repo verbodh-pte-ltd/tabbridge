@@ -74,6 +74,13 @@ npx tabbridge call navigate '{"url":"https://example.com"}'
 npx tabbridge call page_report
 ```
 
+## Teach your agent to use it
+
+[`.agents/skills/tabbridge/SKILL.md`](.agents/skills/tabbridge/SKILL.md) is a ready-made skill: how to
+check the connection, read and act on pages, handle the approval questions, treat page text as
+untrusted, investigate a broken page with the DevTools tools, and save a guide. Copy the
+`tabbridge` folder into your agent's skills folder (for Claude Code: `~/.claude/skills/`).
+
 ## Screenshots become a guide
 
 Every screenshot is saved in the folder the agent works in, as a numbered guide:
@@ -136,6 +143,14 @@ The live test starts its own Chrome profiles and loads the extension through Dev
 profile isn't touched. It names its test browser and pins every call to it, so it is safe to run
 while TabBridge is on in your everyday Chrome.
 
+## Contributing
+
+Anyone is free to use, fork, fix and extend TabBridge: new tools, other browsers, better safety.
+Open an issue to talk about an idea, or send a pull request. How to build, test and what a pull
+request needs: [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE).
+Open source under the **Apache License 2.0** ([LICENSE](LICENSE)). You can use TabBridge for free,
+change it and ship it in your own products, commercial or not; keep the license and copyright notice.
+It also grants a patent license from contributors.
