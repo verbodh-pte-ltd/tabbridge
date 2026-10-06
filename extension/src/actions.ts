@@ -26,7 +26,7 @@ async function point(tabId: number, ref?: string, x?: number, y?: number): Promi
 const describe = (info: any) => [info.role || info.tag, info.label ? `"${info.label}"` : ""].filter(Boolean).join(" ") || `${info.x},${info.y}`;
 
 // GIF recordings in progress, per tab.
-const recordings = new Map<number, { frames: { data: string; t: number }[]; every: number; last: number; started: number }>();
+const recordings = new Map<number, { frames: { data: string; t: number }[]; every: number; last: number; started: number; timer?: ReturnType<typeof setInterval> }>();
 const MAX_FRAMES = 300;
 
 async function encodeGif(frames: { data: string; t: number }[], endTime: number): Promise<string> {
@@ -135,7 +135,8 @@ export const ACTION_HANDLERS: Record<string, Handler> = {
     if (a.action === "start") {
       if (recordings.has(id)) return textResult("Already recording this tab. Call gif_record with action stop first.", true);
       const fps = Math.min(Math.max(Number(a.fps) || 4, 1), 10);
-      const rec = { frames: [] as { data: string; t: number }[], every: 1000 / fps, last: 0, started: Date.now() };
+      const rec = { frames: [] as { data: string; t: number }[], every: 1000 / fps, last: 0, started: Date.now(),
+        timer: undefined as ReturnType<typeof setInterval> | undefined };
       recordings.set(id, rec);
       cdp.frameSinks.set(id, (data, t) => {
         if (t - rec.last < rec.every || rec.frames.length >= MAX_FRAMES) return;
@@ -143,10 +144,18 @@ export const ACTION_HANDLERS: Record<string, Handler> = {
         rec.frames.push({ data, t });
       });
       await cdp.send(id, "Page.startScreencast", { format: "jpeg", quality: 70, maxWidth: 960, maxHeight: 600, everyNthFrame: 1 });
+      // Chrome sends screencast frames only while the window is drawn. When it is behind other
+      // windows, take plain screenshots instead, so the recording still moves.
+      rec.timer = setInterval(async () => {
+        if (Date.now() - rec.last < rec.every * 2 || rec.frames.length >= MAX_FRAMES) return;
+        const shot = await cdp.send(id, "Page.captureScreenshot", { format: "jpeg", quality: 70 }).catch(() => null);
+        if (shot && Date.now() - rec.last >= rec.every) { rec.last = Date.now(); rec.frames.push({ data: shot.data, t: rec.last }); }
+      }, rec.every);
       return textResult(`Recording tab ${id} at ${fps} frames a second (up to ${MAX_FRAMES} frames). Call gif_record with action stop when done.`);
     }
     const rec = recordings.get(id);
     if (!rec) return textResult("This tab isn't being recorded. Call gif_record with action start first.", true);
+    clearInterval(rec.timer);
     await cdp.send(id, "Page.stopScreencast").catch(() => {});
     cdp.frameSinks.delete(id);
     recordings.delete(id);

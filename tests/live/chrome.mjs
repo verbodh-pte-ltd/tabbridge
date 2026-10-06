@@ -34,6 +34,12 @@ export async function launch(extensionDir) {
     "--no-default-browser-check",
     "--disable-search-engine-choice-screen",
     "--window-size=1280,900",
+    // The test window is often behind other windows. Chrome would stop drawing it, which drops
+    // screencast frames and delays input; keep it drawing as if it were in front.
+    "--disable-features=CalculateNativeWinOcclusion",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-background-timer-throttling",
     "about:blank",
   ], { stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"] });
 
@@ -101,11 +107,26 @@ export async function launch(extensionDir) {
 
   /** Runs an expression inside the extension (an extension page), for settings and tab groups. */
   let extSession = null;
-  async function extEval(expression) {
+  async function extEval(expression, retry = true) {
+    try {
+      return await extEvalOnce(expression);
+    } catch (err) {
+      // Chrome may close or discard the helper tab mid-run: open a fresh one, once.
+      if (!retry || !/Session with given id not found|Target closed|No target/i.test(err.message)) throw err;
+      extSession = null;
+      return extEval(expression, false);
+    }
+  }
+  async function extEvalOnce(expression) {
     if (!extSession) {
       const { targetId } = await cdp("Target.createTarget", { url: `chrome-extension://${extensionId}/options.html`, background: true, newWindow: false });
       ({ sessionId: extSession } = await cdp("Target.attachToTarget", { targetId, flatten: true }));
-      await new Promise((r) => setTimeout(r, 500));
+      // Wait until the extension page has loaded and chrome.storage exists.
+      for (let i = 0; i < 50; i++) {
+        const { result } = await cdp("Runtime.evaluate", { expression: "typeof chrome !== 'undefined' && !!chrome.storage", returnByValue: true }, extSession);
+        if (result.value) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
     }
     const { result, exceptionDetails } = await cdp("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }, extSession);
     if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text);

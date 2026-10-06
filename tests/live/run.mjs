@@ -421,7 +421,12 @@ try {
       await sleep(800);
       const c = new BridgeClient("agent-c");
       const { browsersTool } = await import("../../bridge/src/bridge-tools.ts");
-      const list = text(await browsersTool(c, {}));
+      let list = "";
+      for (let i = 0; i < 40; i++) {   // the second Chrome's host may still be starting
+        list = text(await browsersTool(c, {}));
+        if (/tabbridge-live-b/.test(list)) break;
+        await sleep(250);
+      }
       expect(/tabbridge-live-a/.test(list) && /tabbridge-live-b/.test(list), list);
       const picked = text(await browsersTool(c, { select: "tabbridge-live-b" }));
       expect(/\* \d\. tabbridge-live-b/.test(picked), picked);

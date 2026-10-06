@@ -1,5 +1,7 @@
 // Builds store/tabbridge-<version>.zip for the Chrome Web Store: extension/dist without the
 // development "key" (the store rejects a manifest that carries one and assigns its own id).
+// With --unpacked: store/tabbridge-extension-<version>.zip WITH the key, for people who unzip it and
+// Load unpacked (the key keeps the id the host trusts). That one goes on the GitHub release.
 // A tiny zip writer, so no zip tool or dependency is needed on any platform.
 
 import fs from "node:fs";
@@ -10,8 +12,9 @@ const root = path.resolve(import.meta.dirname, "..");
 const dist = path.join(root, "extension", "dist");
 if (!fs.existsSync(path.join(dist, "manifest.json"))) throw new Error("Run npm run build first.");
 
+const unpacked = process.argv.includes("--unpacked");
 const manifest = JSON.parse(fs.readFileSync(path.join(dist, "manifest.json"), "utf8"));
-delete manifest.key;
+if (!unpacked) delete manifest.key;
 
 const files = [];
 (function walk(dir) {
@@ -53,6 +56,6 @@ end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(entries.length, 8); end.writ
 end.writeUInt32LE(centralBuf.length, 12); end.writeUInt32LE(offset, 16);
 
 fs.mkdirSync(path.join(root, "store"), { recursive: true });
-const out = path.join(root, "store", `tabbridge-${manifest.version}.zip`);
+const out = path.join(root, "store", unpacked ? `tabbridge-extension-${manifest.version}.zip` : `tabbridge-${manifest.version}.zip`);
 fs.writeFileSync(out, Buffer.concat([...chunks, centralBuf, end]));
-console.log(`${path.relative(root, out)}: ${entries.length} files, ${Math.round(fs.statSync(out).size / 1024)} KB, no "key" in the manifest`);
+console.log(`${path.relative(root, out)}: ${entries.length} files, ${Math.round(fs.statSync(out).size / 1024)} KB, ${unpacked ? "with the dev key (for Load unpacked)" : "no \"key\" in the manifest (for the store)"}`);

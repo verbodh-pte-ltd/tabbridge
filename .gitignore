@@ -7,3 +7,4 @@ store/*.zip
 *.pem
 bridge/README.md
 bridge/LICENSE
+store/*.tgz

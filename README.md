@@ -23,25 +23,32 @@ How it compares with Claude in Chrome, tool by tool: [docs/compare-claude-in-chr
 
 You need Chrome (or Edge or Brave) and Node.js 20 or newer.
 
-1. **Add the extension:** from the Chrome Web Store, or for development: open `chrome://extensions`,
-   turn on Developer mode, click **Load unpacked** and pick `extension/dist` after `npm run build`.
-2. **Install the bridge once per computer:**
+Until TabBridge is on npm and the Chrome Web Store, install it from the
+[latest GitHub release](https://github.com/verbodh-pte-ltd/tabbridge/releases/latest):
+
+1. **The bridge, once per computer:**
 
    ```
-   npx tabbridge install
+   npm install -g https://github.com/verbodh-pte-ltd/tabbridge/releases/download/v0.1.1/tabbridge-0.1.1.tgz
+   tabbridge install
    ```
 
-   This registers the small host program Chrome talks to. Nothing runs until the extension starts it.
+   `tabbridge install` registers the small host program Chrome talks to. Nothing runs until the
+   extension starts it.
+2. **The extension:** download `tabbridge-extension-0.1.1.zip` from the release and unzip it.
+   Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the
+   unzipped folder.
 3. **Connect your agent:**
 
    ```
-   claude mcp add tabbridge -- npx -y tabbridge mcp          # Claude Code
-   npx tabbridge config codex                                # prints the Codex entry
-   npx tabbridge config gemini                               # Gemini CLI
-   npx tabbridge config cursor                               # Cursor
+   claude mcp add tabbridge -- tabbridge mcp      # Claude Code
+   tabbridge config codex                         # prints the Codex entry (also: gemini, cursor, json)
    ```
 
-4. **Check it:** `npx tabbridge doctor` prints a ✓ or ✗ for every part, and what to do about each ✗.
+4. **Check it:** `tabbridge doctor` prints a ✓ or ✗ for every part, and what to do about each ✗.
+
+Once published, the same steps become `npx tabbridge install`, the Chrome Web Store, and
+`claude mcp add tabbridge -- npx -y tabbridge mcp`.
 
 ## What an agent can do
 

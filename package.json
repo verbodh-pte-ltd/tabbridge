@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test \"tests/*.test.ts\"",
     "test:live": "node tests/live/run.mjs",
-    "package:store": "node scripts/package-store.mjs"
+    "package:store": "node scripts/package-store.mjs",
+    "package:release": "npm run build && node scripts/package-store.mjs --unpacked && node scripts/package-store.mjs && npm pack --workspace bridge --pack-destination store"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.4",
