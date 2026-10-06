@@ -17,6 +17,8 @@ TabBridge gives it hands in the browser.
 your agent ──MCP──► tabbridge mcp ──local pipe──► tabbridge host ──native messaging──► TabBridge extension ──► Chrome
 ```
 
+How it compares with Claude in Chrome, tool by tool: [docs/compare-claude-in-chrome.md](docs/compare-claude-in-chrome.md).
+
 ## Install
 
 You need Chrome (or Edge or Brave) and Node.js 20 or newer.
