@@ -5,8 +5,8 @@ export const HOST_NAME = "com.verbodh.tabbridge";
 
 // The unpacked extension's id: fixed by the public key in extension/static/manifest.json.
 export const DEV_EXTENSION_ID = "biffejdaeofpjdlaemechglldaeanifc";
-// The Chrome Web Store build's id. Filled in after the first store upload.
-export const STORE_EXTENSION_IDS: string[] = [];
+// The Chrome Web Store build's id (https://chromewebstore.google.com/detail/pomolcbmcembghhjgnjllblncbpmihcd).
+export const STORE_EXTENSION_IDS: string[] = ["pomolcbmcembghhjgnjllblncbpmihcd"];
 
 export const PROTOCOL_VERSION = 1;
 
