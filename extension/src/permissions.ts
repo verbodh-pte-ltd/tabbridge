@@ -19,7 +19,7 @@ const pending = new Map<string, { approval: Approval; done: (a: Answer) => void;
 // Sites allowed "once" last for the agent's session only.
 const allowedOnce = new Map<string, Set<string>>();
 
-export const RISKY = /\b(send|submit|buy|pay|purchase|order|checkout|check out|delete|remove|destroy|publish|post|transfer|confirm|sign|approve|merge|deploy|unsubscribe|cancel subscription)\b/i;
+export const RISKY = /\b(send|submit|buy|pay|purchase|order|checkout|check out|delete|remove|destroy|publish|post|transfer|confirm|sign|approve|merge|deploy|unsubscribe|cancel subscription|upload)\b/i;
 
 /** Pages Chrome doesn't let extensions touch, plus blank pages, need no permission. */
 export function originOf(url: string | undefined): string | null {

@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import { encodeLine, encodeNative, lineDecoder, nativeDecoder } from "./framing.ts";
-import { homeDir, logPath, pipePath, tokenPath } from "./paths.ts";
+import { homeDir, logPath, MAX_BROWSERS, pipeAlive, pipePath, tokenPath, writeBrowser } from "./paths.ts";
 import { PROTOCOL_VERSION, textResult, type ExtensionToHost, type HostToExtension } from "./shared/protocol.ts";
 
 interface HostOptions {
@@ -17,7 +17,11 @@ interface HostOptions {
 export async function runHost({ input, output, log = fileLog }: HostOptions): Promise<net.Server> {
   fs.mkdirSync(homeDir(), { recursive: true, mode: 0o700 });
   const token = crypto.randomBytes(32).toString("hex");
-  fs.writeFileSync(tokenPath(), token, { mode: 0o600 });
+  let slot = 0;
+  let label = "";
+  const register = () => {
+    if (slot) writeBrowser({ slot, label: label || `Chrome ${slot}`, pid: process.pid, started: new Date().toISOString() });
+  };
 
   let extensionReady = false;
   const sessions = new Map<string, net.Socket>();
@@ -26,9 +30,14 @@ export async function runHost({ input, output, log = fileLog }: HostOptions): Pr
   const toExtension = (message: HostToExtension) => output.write(encodeNative(message));
 
   input.on("data", nativeDecoder((message: ExtensionToHost) => {
-    if (message.type === "ready") {
+    if (message.type === "label") {
+      label = message.label;
+      register();
+    } else if (message.type === "ready") {
       extensionReady = true;
-      log(`extension ready, version ${message.version}`);
+      label = message.label ?? label;
+      register();
+      log(`extension ready, version ${message.version}, browser "${label}"`);
       for (const [session, socket] of sessions) toExtension({ type: "session_open", session, client: clientOf(socket) });
     } else if (message.type === "result") {
       const call = pending.get(message.id);
@@ -82,12 +91,15 @@ export async function runHost({ input, output, log = fileLog }: HostOptions): Pr
     log("extension disconnected; host stopping");
     server.close();
     for (const socket of sessions.values()) socket.destroy();
-    if (process.platform !== "win32") fs.rmSync(pipePath(), { force: true });
+    if (process.platform !== "win32") fs.rmSync(pipePath(slot), { force: true });
+    if (slot) writeBrowser({ slot, remove: true });
     if (input === process.stdin) process.exit(0);
   });
 
-  await listen(server, log);
-  log(`host listening on ${pipePath()}`);
+  slot = await listen(server, log);
+  fs.writeFileSync(tokenPath(slot), token, { mode: 0o600 });
+  register();
+  log(`host listening on ${pipePath(slot)} (browser slot ${slot})`);
   return server;
 }
 
@@ -102,36 +114,26 @@ function sameToken(given: string, token: string): boolean {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-async function listen(server: net.Server, log: (line: string) => void): Promise<void> {
-  const where = pipePath();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(where, resolve);
-    });
-  } catch (err: any) {
-    if (err.code !== "EADDRINUSE") throw err;
-    // A socket file left by a host that crashed: remove it if nothing answers, then retry.
-    // A live pipe means another Chrome profile already runs a host: this one stops.
-    if (await alive(where)) {
-      log("another TabBridge host is already running (another Chrome profile?); this one stops");
-      throw new Error("TabBridge host already running");
-    }
+/** Takes the first free slot. A slot whose pipe answers belongs to another Chrome; a dead socket file is cleared. */
+async function listen(server: net.Server, log: (line: string) => void): Promise<number> {
+  for (let slot = 1; slot <= MAX_BROWSERS; slot++) {
+    const where = pipePath(slot);
+    if (await pipeAlive(where)) continue;
     if (process.platform !== "win32") fs.rmSync(where, { force: true });
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(where, resolve);
-    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(where, resolve);
+      });
+    } catch (err: any) {
+      if (err.code === "EADDRINUSE") continue;
+      throw err;
+    }
+    if (process.platform !== "win32") fs.chmodSync(where, 0o600);
+    return slot;
   }
-  if (process.platform !== "win32") fs.chmodSync(where, 0o600);
-}
-
-function alive(where: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const probe = net.connect(where);
-    probe.once("connect", () => { probe.destroy(); resolve(true); });
-    probe.once("error", () => resolve(false));
-  });
+  log(`all ${MAX_BROWSERS} browser slots are taken; this host stops`);
+  throw new Error("No free TabBridge slot");
 }
 
 function fileLog(line: string): void {

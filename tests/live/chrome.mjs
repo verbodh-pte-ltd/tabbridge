@@ -67,7 +67,8 @@ export async function launch(extensionDir) {
   async function close() {
     await cdp("Browser.close").catch(() => {});
     await new Promise((r) => { child.once("exit", r); setTimeout(r, 5000); });
-    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+    // Chrome can hold profile files for a moment after exit; a leftover temp folder is harmless.
+    try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); } catch { /* left in temp */ }
   }
 
   /** Waits for a TabBridge approval window and clicks the button with this text. */

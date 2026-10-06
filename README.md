@@ -45,7 +45,12 @@ You need Chrome (or Edge or Brave) and Node.js 20 or newer.
 | `read_page`, `find` | The page as a list of elements with refs (`e12`) to act on |
 | `get_page_text` | The readable text |
 | `screenshot` | A picture of the page, also saved into a step-by-step guide |
-| `click`, `type`, `key`, `scroll`, `form_input` | Act on the page |
+| `click`, `type`, `key`, `scroll`, `form_input` | Act on the page; `click` also does double and triple clicks, with Control/Shift held |
+| `hover`, `drag` | Open menus and tooltips; drag widgets and HTML drag-and-drop |
+| `zoom` | A sharper picture of a small region |
+| `file_upload` | Put files from this computer into a file field (asks you first) |
+| `gif_record` | Record the tab as an animated GIF, saved into the guide |
+| `browsers` | When several Chromes or profiles run TabBridge: list them, pick one by name |
 | `javascript` | Run a script in the page |
 | `wait_for`, `resize_window`, `downloads` | Wait for text, size the window, see downloaded files |
 | `console_messages`, `network_requests`, `network_request` | DevTools Console and Network, with headers and bodies |
@@ -74,7 +79,14 @@ tabbridge/
     └── 02-second-look.jpg
 ```
 
-`TABBRIDGE_OUTPUT=<folder>` moves it; `TABBRIDGE_GUIDE=0` turns it off.
+`TABBRIDGE_OUTPUT=<folder>` moves it; `TABBRIDGE_GUIDE=0` turns it off. GIF recordings land in
+the same guide.
+
+## More than one Chrome
+
+Each Chrome (or profile) running TabBridge gets its own slot. Name each one in TabBridge's settings
+("Work", "Testing"…). Agents use the `browsers` tool to list and pick; scripts set
+`TABBRIDGE_BROWSER=<name>`. With one Chrome, nothing to do.
 
 ## Safety
 
@@ -113,9 +125,9 @@ npm run test:live     # real Chrome in a throwaway profile, a local test site, e
 npm run package:store # store/tabbridge-<version>.zip for the Chrome Web Store
 ```
 
-The live test starts its own Chrome profile and loads the extension through DevTools, so your own
-profile isn't touched. Turn the extension off in your everyday Chrome while it runs: only one
-Chrome at a time can hold the host.
+The live test starts its own Chrome profiles and loads the extension through DevTools, so your own
+profile isn't touched. It names its test browser and pins every call to it, so it is safe to run
+while TabBridge is on in your everyday Chrome.
 
 ## License
 

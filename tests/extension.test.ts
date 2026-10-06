@@ -5,20 +5,20 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { TOOL_NAMES } from "../bridge/src/shared/tools.ts";
+import { BRIDGE_TOOLS, TOOL_NAMES } from "../bridge/src/shared/tools.ts";
 import { parseKeys } from "../extension/src/keys.ts";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
 test("the extension implements exactly the advertised tools", () => {
   const handlers: string[] = [];
-  for (const [file, start] of [["tools.ts", "export const HANDLERS"], ["inspect.ts", "export const INSPECT_HANDLERS"]]) {
+  for (const [file, start] of [["tools.ts", "export const HANDLERS"], ["inspect.ts", "export const INSPECT_HANDLERS"], ["actions.ts", "export const ACTION_HANDLERS"]]) {
     const src = fs.readFileSync(path.join(ROOT, "extension/src", file), "utf8");
     const block = src.slice(src.indexOf(start));
     const end = block.search(/^};/m);
     handlers.push(...[...block.slice(0, end).matchAll(/^ {2}async (\w+)\(/gm)].map((m) => m[1]));
   }
-  assert.deepEqual([...handlers].sort(), [...TOOL_NAMES].sort());
+  assert.deepEqual([...handlers].sort(), TOOL_NAMES.filter((t) => !BRIDGE_TOOLS.includes(t)).sort());
 });
 
 test("keys: plain, combined and several presses", () => {
@@ -41,7 +41,8 @@ test("risky labels are caught, ordinary ones are not", async () => {
   };
   const { RISKY } = await import("../extension/src/permissions.ts");
   for (const risky of ["click button \"Send\"", "click button \"Place order\"", "click \"Delete project\"",
-    "press Enter, which submits \"Pay now\"", "click link \"Publish\"", "click \"Merge pull request\""]) {
+    "press Enter, which submits \"Pay now\"", "click link \"Publish\"", "click \"Merge pull request\"",
+    "upload report.pdf from this computer"]) {
     assert.ok(RISKY.test(risky), risky);
   }
   for (const safe of ["click link \"Docs\"", "click button \"Next\"", "click textbox \"Search\"", "click \"Settings\"",

@@ -2,7 +2,9 @@
   "name": "tabbridge-repo",
   "private": true,
   "type": "module",
-  "workspaces": ["bridge"],
+  "workspaces": [
+    "bridge"
+  ],
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json",
@@ -14,6 +16,7 @@
     "@types/chrome": "^0.3.4",
     "@types/node": "^24.0.0",
     "esbuild": "^0.28.2",
+    "gifenc": "^1.0.3",
     "typescript": "^7.0.2"
   }
 }

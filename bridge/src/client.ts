@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import net from "node:net";
 import { encodeLine, lineDecoder } from "./framing.ts";
-import { pipePath, tokenPath } from "./paths.ts";
+import { liveBrowsers, pipePath, tokenPath, type BrowserEntry } from "./paths.ts";
 import { PROTOCOL_VERSION, textResult, type ToolResult } from "./shared/protocol.ts";
 
 export const NOT_CONNECTED =
@@ -16,9 +16,33 @@ export class BridgeClient {
   private nextId = 1;
   private waiting = new Map<string, (result: ToolResult) => void>();
   private client: string;
+  private slot: number | null = null;   // which Chrome; null = decide on first call
+  private wanted = process.env.TABBRIDGE_BROWSER ?? "";
 
   constructor(client: string) {
     this.client = client;
+  }
+
+  /** Every Chrome running TabBridge, with the one this client uses marked. */
+  async browsers(): Promise<(BrowserEntry & { selected: boolean })[]> {
+    const live = await liveBrowsers();
+    const current = this.slot ?? (await this.pick(live))?.slot;
+    return live.map((b) => ({ ...b, selected: b.slot === current }));
+  }
+
+  /** Switch to another Chrome, by its name (as set in TabBridge settings) or its number. */
+  async selectBrowser(nameOrSlot: string): Promise<BrowserEntry> {
+    const live = await liveBrowsers();
+    const found = match(live, nameOrSlot);
+    if (!found) throw new Error(`No running Chrome called "${nameOrSlot}". Running: ${live.map((b) => `${b.slot}. ${b.label}`).join(", ") || "none"}`);
+    this.close();
+    this.slot = found.slot;
+    this.wanted = nameOrSlot;
+    return found;
+  }
+
+  private async pick(live: BrowserEntry[]): Promise<BrowserEntry | undefined> {
+    return (this.wanted ? match(live, this.wanted) : undefined) ?? live[0];
   }
 
   setClient(name: string): void {
@@ -51,15 +75,22 @@ export class BridgeClient {
   private connect(): Promise<void> {
     if (this.socket && !this.socket.destroyed) return Promise.resolve();
     if (this.connecting) return this.connecting;
-    this.connecting = new Promise<void>((resolve, reject) => {
+    this.connecting = new Promise<void>(async (resolve, reject) => {
+      if (this.slot === null || !this.wanted) {
+        const chosen = await this.pick(await liveBrowsers());
+        if (!chosen) { reject(new Error(NOT_CONNECTED)); return; }
+        if (this.wanted && !match([chosen], this.wanted)) { reject(new Error(NOT_CONNECTED)); return; }
+        this.slot = chosen.slot;
+      }
+      const slot = this.slot;
       let token: string;
       try {
-        token = fs.readFileSync(tokenPath(), "utf8").trim();
+        token = fs.readFileSync(tokenPath(slot), "utf8").trim();
       } catch {
         reject(new Error(NOT_CONNECTED));
         return;
       }
-      const socket = net.connect(pipePath());
+      const socket = net.connect(pipePath(slot));
       let welcomed = false;
       socket.once("error", () => { if (!welcomed) reject(new Error(NOT_CONNECTED)); });
       socket.on("connect", () => {
@@ -79,10 +110,17 @@ export class BridgeClient {
       }));
       socket.on("close", () => {
         if (this.socket === socket) this.socket = null;
+        if (!this.wanted) this.slot = null;   // not pinned: next call picks whichever Chrome is running
         for (const done of this.waiting.values()) done(textResult(NOT_CONNECTED, true));
         this.waiting.clear();
       });
     }).finally(() => { this.connecting = null; });
     return this.connecting;
   }
+}
+
+function match(list: BrowserEntry[], nameOrSlot: string): BrowserEntry | undefined {
+  const want = nameOrSlot.trim().toLowerCase();
+  return list.find((b) => String(b.slot) === want) ?? list.find((b) => b.label.toLowerCase() === want)
+    ?? list.find((b) => b.label.toLowerCase().includes(want));
 }

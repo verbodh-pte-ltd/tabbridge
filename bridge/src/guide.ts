@@ -42,6 +42,7 @@ export class GuideRecorder {
     const meta = result.content.find((c) => c.type === "text" && c.text.startsWith("tabbridge-meta "));
     const content = result.content.filter((c) => c !== meta);
     if (result.isError) return { ...result, content };
+    if (tool === "gif_record" && args.action === "stop") return this.recording(args, result, content, meta);
     if (tool !== "screenshot") {
       const action = describe(tool, args, result);
       if (action) this.actions.push(action);
@@ -59,9 +60,31 @@ export class GuideRecorder {
     }
   }
 
+  /** A finished GIF is always saved (even with the screenshot guide off), and never sent to the agent: it is large. */
+  private recording(args: Record<string, any>, result: ToolResult, content: ToolResult["content"], meta: any): ToolResult {
+    const gif = content.find((c) => c.type === "image" && c.mimeType === "image/gif");
+    if (!gif || gif.type !== "image") return { ...result, content };
+    let page = { title: "", url: "" };
+    try { page = JSON.parse(meta.text.slice("tabbridge-meta ".length)); } catch { /* no meta */ }
+    try {
+      const folder = this.guideFolder(page);
+      const n = stepCount(folder) + 1;
+      const title = args.name ? String(args.name) : `Recording of ${page.title || hostOf(page.url) || "the tab"}`;
+      const file = `${two(n)}-${slug(title)}.gif`;
+      fs.writeFileSync(path.join(folder, file), Buffer.from(gif.data, "base64"));
+      const done = this.actions.length ? this.actions.map((a) => `- ${a}`).join("\n") + "\n\n" : "";
+      fs.appendFileSync(path.join(folder, "README.md"), `## Step ${n}: ${title}\n\n${done}![Step ${n}: ${title}](${file})\n\n`);
+      this.actions = [];
+      const rel = path.relative(process.cwd(), path.join(folder, file)) || file;
+      return { content: [...content.filter((c) => c !== gif), { type: "text", text: `Saved the recording: ${rel}` }] };
+    } catch (err: any) {
+      return { content: [...content.filter((c) => c !== gif), { type: "text", text: `(Could not save the recording: ${err.message})` }], isError: true };
+    }
+  }
+
   private save(base64: string, page: { title: string; url: string }, caption: string): string {
     const folder = this.guideFolder(page);
-    const steps = fs.readdirSync(folder).filter((f) => /^\d+-.*\.jpg$/.test(f)).length;
+    const steps = stepCount(folder);
     const n = steps + 1;
     const title = caption || page.title || hostOf(page.url) || `Step ${n}`;
     const file = `${two(n)}-${slug(title)}.jpg`;
@@ -102,6 +125,10 @@ export class GuideRecorder {
   }
 }
 
+function stepCount(folder: string): number {
+  return fs.readdirSync(folder).filter((f) => /^\d+-.*\.(jpg|gif)$/.test(f)).length;
+}
+
 function hostOf(url: string): string {
   try { return new URL(url).host; } catch { return ""; }
 }
@@ -117,6 +144,10 @@ function describe(tool: string, args: Record<string, any>, result: ToolResult): 
     case "form_input": return `Filled in a field (${args.ref}) with ${typeof args.value === "boolean" ? (args.value ? "on" : "off") : `"${String(args.value).slice(0, 40)}"`}`;
     case "scroll": return args.ref ? `Scrolled to ${args.ref}` : `Scrolled ${args.direction ?? "down"}`;
     case "tab_select": return `Switched to tab ${args.tabId}`;
+    case "hover": return args.ref ? `Hovered over ${args.ref}` : `Hovered at ${args.x},${args.y}`;
+    case "drag": return text.replace(/\.$/, "");
+    case "file_upload": return `Attached ${(args.paths ?? []).map((p: string) => path.basename(p)).join(", ")}`;
+    case "gif_record": return args.action === "start" ? "Started recording" : null;
     case "resize_window": return `Resized the window to ${args.width}×${args.height}`;
     default: return null;   // reading tools change nothing on screen
   }

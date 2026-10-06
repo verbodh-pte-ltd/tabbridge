@@ -1,4 +1,4 @@
-import { getSettings, getSites, setSettings, setSite, type Settings } from "./settings.ts";
+import { browserLabel, getSettings, getSites, setSettings, setSite, type Settings } from "./settings.ts";
 
 // Each checkbox, and how it maps to a setting. Two are worded the other way round on the page.
 const BOXES: [string, keyof Settings, boolean][] = [
@@ -11,7 +11,11 @@ const BOXES: [string, keyof Settings, boolean][] = [
 
 async function render(): Promise<void> {
   const settings = await getSettings();
-  for (const [id, key, inverted] of BOXES) (document.getElementById(id) as HTMLInputElement).checked = inverted ? !settings[key] : settings[key];
+  for (const [id, key, inverted] of BOXES) (document.getElementById(id) as HTMLInputElement).checked = inverted ? !settings[key] : !!settings[key];
+
+  const nameBox = document.getElementById("browserName") as HTMLInputElement;
+  nameBox.placeholder = await browserLabel();
+  nameBox.value = settings.browserName;
 
   const yes = (on: boolean) => (on ? "on" : "off");
   document.getElementById("incognito")!.textContent = yes(await chrome.extension.isAllowedIncognitoAccess());
@@ -40,6 +44,10 @@ for (const [id, key, inverted] of BOXES) {
     render();
   });
 }
+document.getElementById("saveName")!.addEventListener("click", async () => {
+  await setSettings({ browserName: (document.getElementById("browserName") as HTMLInputElement).value.trim() });
+  render();
+});
 document.getElementById("open-chrome")!.addEventListener("click", () => {
   chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` });
 });

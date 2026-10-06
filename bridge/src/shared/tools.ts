@@ -59,9 +59,36 @@ export const TOOLS: ToolDef[] = [
   tool("click", "Click an element by ref, or a point by x/y from the last screenshot.", {
     ref, x: { type: "number" }, y: { type: "number" },
     button: { type: "string", enum: ["left", "right", "middle"] },
-    clickCount: { type: "number", description: "2 for a double click." },
+    clickCount: { type: "number", description: "2 for a double click, 3 for a triple click (selects a paragraph)." },
+    modifiers: { type: "string", description: "Keys held during the click, for example Control or Shift+Control." },
     tabId,
   }),
+  tool("hover", "Move the mouse over an element or a point, to open menus and tooltips.", {
+    ref, x: { type: "number" }, y: { type: "number" }, tabId,
+  }),
+  tool("drag", "Drag from one element or point to another. Works for both mouse-drag widgets and HTML drag-and-drop.", {
+    fromRef: { type: "string" }, fromX: { type: "number" }, fromY: { type: "number" },
+    toRef: { type: "string" }, toX: { type: "number" }, toY: { type: "number" },
+    tabId,
+  }),
+  tool("zoom", "A sharper picture of one region of the page, for small text and icons. x0,y0 to x1,y1 in screenshot pixels.", {
+    x0: { type: "number" }, y0: { type: "number" }, x1: { type: "number" }, y1: { type: "number" }, tabId,
+  }, ["x0", "y0", "x1", "y1"]),
+  tool("file_upload",
+    "Put files from this computer into a file field on the page. The user is asked first. " +
+    "Paths may be relative to the folder the agent works in.", {
+    ref, selector: { type: "string", description: "A CSS selector, instead of a ref." },
+    paths: { type: "array", items: { type: "string" } },
+    tabId,
+  }, ["paths"]),
+  tool("gif_record",
+    "Record the tab as an animated GIF: action start, do the steps, then action stop. " +
+    "The GIF is saved in the project's tabbridge/ folder.", {
+    action: { type: "string", enum: ["start", "stop"] },
+    name: { type: "string", description: "File name for the GIF, on stop." },
+    fps: { type: "number", description: "Frames per second, 1 to 10. Default 4." },
+    tabId,
+  }, ["action"]),
   tool("type", "Type text into the focused element, as if from the keyboard.", {
     text: { type: "string" }, tabId,
   }, ["text"]),
@@ -120,12 +147,20 @@ export const TOOLS: ToolDef[] = [
     "Call it when the user says they sent you something from the browser.", {
     clear: { type: "boolean", description: "Remove them after reading. Default true." },
   }),
+  tool("browsers",
+    "List the Chrome windows running TabBridge (each has a name set in TabBridge settings), or pick which one " +
+    "to use from now on. Only needed when more than one Chrome or profile runs TabBridge.", {
+    select: { type: "string", description: "A browser's name or number to switch to." },
+  }),
   tool("resize_window", "Set the size of the window that holds the tab.", {
     width: { type: "number" }, height: { type: "number" }, tabId,
   }, ["width", "height"]),
 ];
 
 export const TOOL_NAMES = TOOLS.map((t) => t.name);
+
+/** Tools the bridge answers itself, without asking Chrome. */
+export const BRIDGE_TOOLS = ["browsers"];
 
 export const SERVER_INSTRUCTIONS = [
   "TabBridge drives the user's own Chrome, with their sign-ins.",

@@ -5,6 +5,7 @@ import { textResult } from "../../bridge/src/shared/protocol.ts";
 import * as cdp from "./cdp.ts";
 import { parseKeys } from "./keys.ts";
 import { checkRisky, checkSite } from "./permissions.ts";
+import { ACTION_HANDLERS } from "./actions.ts";
 import { INSPECT_HANDLERS } from "./inspect.ts";
 import { addToGroup, groupTabs, resolveTab, type Session } from "./sessions.ts";
 
@@ -50,6 +51,14 @@ export async function usable(s: Session, a: Args): Promise<chrome.tabs.Tab> {
 
 export class Refused extends Error {}
 
+/** Mouse and keyboard events only land in the tab in front, so input tools bring theirs forward. */
+export async function foreground(tab: chrome.tabs.Tab): Promise<void> {
+  if (!tab.active) {
+    await chrome.tabs.update(tab.id!, { active: true });
+    await sleep(150);
+  }
+}
+
 function normaliseUrl(url: string): string {
   if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return url;
   return `https://${url}`;
@@ -85,6 +94,11 @@ async function settle(tabId: number): Promise<void> {
   await sleep(350);
   const tab = await chrome.tabs.get(tabId).catch(() => null);
   if (tab?.status === "loading") await waitForLoad(tabId, 10_000);
+}
+
+function mouseModifiers(text: unknown): number {
+  const bits: Record<string, number> = { alt: 1, control: 2, ctrl: 2, meta: 4, cmd: 4, command: 4, shift: 8 };
+  return String(text ?? "").split(/[+\s]+/).filter(Boolean).reduce((m, k) => m | (bits[k.toLowerCase()] ?? 0), 0);
 }
 
 const describe = (info: any) =>
@@ -188,6 +202,7 @@ export const HANDLERS: Record<string, Handler> = {
 
   async click(s, a) {
     const tab = await usable(s, a);
+    await foreground(tab);
     let info: any;
     if (a.ref) {
       info = await agent(tab.id!, "refInfo", String(a.ref), true);
@@ -201,10 +216,14 @@ export const HANDLERS: Record<string, Handler> = {
     const refused = await checkRisky(s.client, tab.url, `click ${what}`);
     if (refused) throw new Refused(refused);
     const button = a.button ?? "left";
-    const clickCount = Number(a.clickCount) || 1;
-    await cdp.send(tab.id!, "Input.dispatchMouseEvent", { type: "mouseMoved", x: info.x, y: info.y });
-    await cdp.send(tab.id!, "Input.dispatchMouseEvent", { type: "mousePressed", x: info.x, y: info.y, button, clickCount });
-    await cdp.send(tab.id!, "Input.dispatchMouseEvent", { type: "mouseReleased", x: info.x, y: info.y, button, clickCount });
+    const clicks = Math.min(Math.max(Number(a.clickCount) || 1, 1), 3);
+    const modifiers = mouseModifiers(a.modifiers);
+    await cdp.send(tab.id!, "Input.dispatchMouseEvent", { type: "mouseMoved", x: info.x, y: info.y, modifiers });
+    // A double or triple click is a run of presses with a rising clickCount, as a real mouse sends.
+    for (let clickCount = 1; clickCount <= clicks; clickCount++) {
+      await cdp.send(tab.id!, "Input.dispatchMouseEvent", { type: "mousePressed", x: info.x, y: info.y, button, clickCount, modifiers });
+      await cdp.send(tab.id!, "Input.dispatchMouseEvent", { type: "mouseReleased", x: info.x, y: info.y, button, clickCount, modifiers });
+    }
     await settle(tab.id!);
     const note = info.covered ? " Another element was on top of it, so the click may have landed on that instead." : "";
     return textResult(`Clicked ${untrusted(tab.url, what)}.${note}`);
@@ -212,12 +231,14 @@ export const HANDLERS: Record<string, Handler> = {
 
   async type(s, a) {
     const tab = await usable(s, a);
+    await foreground(tab);
     await cdp.send(tab.id!, "Input.insertText", { text: String(a.text ?? "") });
     return textResult(`Typed ${String(a.text ?? "").length} characters.`);
   },
 
   async key(s, a) {
     const tab = await usable(s, a);
+    await foreground(tab);
     const presses = parseKeys(String(a.keys ?? ""));
     if (presses.some((p) => p.key === "Enter")) {
       const focus: any = await agent(tab.id!, "focusInfo");
@@ -239,6 +260,7 @@ export const HANDLERS: Record<string, Handler> = {
 
   async scroll(s, a) {
     const tab = await usable(s, a);
+    await foreground(tab);
     if (a.ref) {
       const info: any = await agent(tab.id!, "refInfo", String(a.ref), true);
       return info.ok ? textResult(`Scrolled ${a.ref} into view.`) : textResult(info.error, true);
@@ -341,7 +363,7 @@ export const HANDLERS: Record<string, Handler> = {
 };
 
 export async function runTool(s: Session, tool: string, args: Args): Promise<ToolResult> {
-  const handler = HANDLERS[tool] ?? INSPECT_HANDLERS[tool];
+  const handler = HANDLERS[tool] ?? INSPECT_HANDLERS[tool] ?? ACTION_HANDLERS[tool];
   if (!handler) return textResult(`TabBridge has no tool called ${tool}. Update the extension and the bridge to the same version.`, true);
   try {
     return await handler(s, args ?? {});

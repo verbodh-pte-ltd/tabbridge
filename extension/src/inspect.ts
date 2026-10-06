@@ -39,7 +39,7 @@ async function evaluate<T = any>(tabId: number, expression: string): Promise<T> 
 }
 
 /** A DevTools handle (objectId) for an element named by ref or CSS selector. */
-async function elementHandle(tabId: number, a: Args): Promise<string> {
+export async function elementHandle(tabId: number, a: Args): Promise<string> {
   let selector = a.selector ? String(a.selector) : "";
   if (a.ref) {
     const nonce = crypto.randomUUID();

@@ -38,7 +38,8 @@ export type HostToExtension =
   | { type: "call"; id: string; session: string; tool: string; args: Record<string, unknown> };
 
 export type ExtensionToHost =
-  | { type: "ready"; version: string; protocol: number }
+  | { type: "ready"; version: string; protocol: number; label?: string }
+  | { type: "label"; label: string }
   | { type: "result"; id: string; result: ToolResult };
 
 export function textResult(text: string, isError = false): ToolResult {

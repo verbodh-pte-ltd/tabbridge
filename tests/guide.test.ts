@@ -61,3 +61,22 @@ test("TABBRIDGE_GUIDE=0 turns it off", () => {
   delete process.env.TABBRIDGE_GUIDE;
   assert.deepEqual(fs.readdirSync(root), []);
 });
+
+test("a GIF recording is saved as a guide step and not sent back to the agent", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tabbridge-guide-"));
+  const g = new GuideRecorder("x", root);
+  g.record("gif_record", { action: "start" }, text("Recording"));
+  g.record("click", {}, text('Clicked button "Next".'));
+  const out = g.record("gif_record", { action: "stop", name: "Next button flow" }, {
+    content: [
+      { type: "image", data: IMG, mimeType: "image/gif" },
+      { type: "text", text: "Recorded 3 frames over 2 s." },
+      { type: "text", text: `tabbridge-meta ${JSON.stringify({ title: "Flow", url: "https://a.example" })}` },
+    ],
+  });
+  assert.ok(!out.content.some((c: any) => c.type === "image"), "the GIF went back to the agent");
+  assert.ok(out.content.some((c: any) => c.type === "text" && /01-next-button-flow\.gif/.test(c.text)));
+  const [folder] = fs.readdirSync(root);
+  const readme = fs.readFileSync(path.join(root, folder, "README.md"), "utf8");
+  assert.match(readme, /## Step 1: Next button flow\n\n- Started recording\n- Clicked button "Next"/);
+});

@@ -5,7 +5,7 @@ import { HOST_NAME, PROTOCOL_VERSION, type HostToExtension } from "../../bridge/
 import { setUpMenus } from "./capture.ts";
 import { endSession } from "./permissions.ts";
 import { allSessions, closeSession, getSession, groupTabs, openSession } from "./sessions.ts";
-import type { Status } from "./settings.ts";
+import { browserLabel, type Status } from "./settings.ts";
 import { runTool } from "./tools.ts";
 
 let port: chrome.runtime.Port | null = null;
@@ -37,7 +37,8 @@ function connect(): void {
     for (const s of allSessions()) { closeSession(s.session); endSession(s.session); }
     scheduleRetry(why);
   });
-  port.postMessage({ type: "ready", version: chrome.runtime.getManifest().version, protocol: PROTOCOL_VERSION });
+  const ready = port;
+  browserLabel().then((label) => ready.postMessage({ type: "ready", version: chrome.runtime.getManifest().version, protocol: PROTOCOL_VERSION, label }));
   retryMs = 1000;
   publish({ connected: true, error: undefined });
 }
@@ -76,3 +77,8 @@ chrome.runtime.onMessage.addListener((message, _sender, reply) => {
   if (message?.type === "reconnect") { retryMs = 1000; connect(); reply(true); }
 });
 connect();
+
+// Renaming this browser in Settings updates what agents see in the browsers tool.
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area === "local" && changes.settings && port) port.postMessage({ type: "label", label: await browserLabel() });
+});

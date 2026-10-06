@@ -1,3 +1,4 @@
+import { browsersTool, isResult, prepareUpload } from "./bridge-tools.ts";
 import { BridgeClient } from "./client.ts";
 import { GuideRecorder } from "./guide.ts";
 import { doctor, install, uninstall } from "./install.ts";
@@ -26,6 +27,7 @@ const HELP = `TabBridge ${VERSION}: lets any AI agent use your Chrome.
                                             how to connect an agent
   tabbridge mcp                             the MCP server (agents start this)
   tabbridge call <tool> ['<json args>']     run one tool and print the result (for apps and scripts)
+                                            TABBRIDGE_BROWSER=<name> picks the Chrome when several run it
   tabbridge tools                           list the tools`;
 
 async function main(argv: string[]): Promise<number> {
@@ -60,7 +62,17 @@ async function main(argv: string[]): Promise<number> {
       try { args = json ? JSON.parse(json) : {}; } catch { console.error("The arguments must be JSON."); return 2; }
       const name = process.env.TABBRIDGE_CLIENT || "cli";
       const client = new BridgeClient(name);
-      const result = new GuideRecorder(name).record(tool, args, await client.call(tool, args));
+      let send: Record<string, any> = args;
+      let result;
+      if (tool === "browsers") result = await browsersTool(client, args);
+      else {
+        if (tool === "file_upload") {
+          const prepared = prepareUpload(args);
+          if (isResult(prepared)) { console.log(JSON.stringify(prepared, null, 2)); return 1; }
+          send = prepared;
+        }
+        result = new GuideRecorder(name).record(tool, args, await client.call(tool, send));
+      }
       client.close();
       // Images are saved to the guide; printing their base64 would flood the terminal.
       const printable = { ...result, content: result.content.map((c) => c.type === "image" ? { type: "image", mimeType: c.mimeType, bytes: Math.round(c.data.length * 0.75) } : c) };

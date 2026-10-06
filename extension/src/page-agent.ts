@@ -156,15 +156,25 @@ interface Info {
   function find(query: string, max: number): string {
     const q = query.toLowerCase();
     const hits: string[] = [];
+    const textHits: string[] = [];
     for (const el of walk(document.body)) {
+      if (!visible(el)) continue;
       const r = role(el);
-      if (!r || !visible(el)) continue;
-      const hay = [label(el), el.getAttribute("placeholder"), el.getAttribute("title"), el.getAttribute("name")]
-        .join(" ").toLowerCase();
-      if (hay.includes(q)) hits.push(describe(el, r));
+      if (r) {
+        const hay = [label(el), el.getAttribute("placeholder"), el.getAttribute("title"), el.getAttribute("name")]
+          .join(" ").toLowerCase();
+        if (hay.includes(q)) hits.push(describe(el, r));
+      } else {
+        // Plain text (a div, a span, a heading): match on the element's own text, not its children's,
+        // so the innermost element holding the words is the one returned.
+        const own = Array.from(el.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join(" ");
+        if (own.toLowerCase().includes(q) && textHits.length < max) textHits.push(describe(el, el.tagName.toLowerCase()));
+      }
       if (hits.length >= max) break;
     }
-    return hits.length ? hits.join("\n") : `Nothing on the page matches ${JSON.stringify(query)}.`;
+    // Controls first: "Name" should find the Name field before the word "Name" in its label.
+    const all = [...hits, ...textHits].slice(0, max);
+    return all.length ? all.join("\n") : `Nothing on the page matches ${JSON.stringify(query)}.`;
   }
 
   function formOf(el: Element): HTMLFormElement | null {

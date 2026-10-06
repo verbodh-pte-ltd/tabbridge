@@ -77,10 +77,30 @@ function stringify(arg: any): string {
   return arg.description ?? arg.unserializableValue ?? arg.type;
 }
 
+// One-off waits (drag-and-drop) and screencast receivers (GIF recording), per tab.
+const waiters: { tabId: number; method: string; done: (params: any) => void }[] = [];
+export const frameSinks = new Map<number, (data: string, timestamp: number) => void>();
+
+/** Resolves with the next event of this kind on the tab, or null after timeoutMs. */
+export function nextEvent(tabId: number, method: string, timeoutMs: number): Promise<any> {
+  return new Promise((resolve) => {
+    const w = { tabId, method, done: (p: any) => { clearTimeout(timer); resolve(p); } };
+    const timer = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); resolve(null); }, timeoutMs);
+    waiters.push(w);
+  });
+}
+
 chrome.debugger.onEvent.addListener((source, method, params: any) => {
   const tabId = source.tabId;
   if (tabId === undefined) return;
   const now = Date.now();
+  const waiting = waiters.findIndex((w) => w.tabId === tabId && w.method === method);
+  if (waiting >= 0) waiters.splice(waiting, 1)[0].done(params);
+  if (method === "Page.screencastFrame") {
+    chrome.debugger.sendCommand({ tabId }, "Page.screencastFrameAck", { sessionId: params.sessionId }).catch(() => {});
+    frameSinks.get(tabId)?.(params.data, (params.metadata?.timestamp ?? now / 1000) * 1000);
+    return;
+  }
   if (method === "Runtime.consoleAPICalled") {
     pushConsole(tabId, {
       level: params.type === "warning" ? "warn" : params.type,

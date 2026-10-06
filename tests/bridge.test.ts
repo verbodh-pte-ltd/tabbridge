@@ -167,3 +167,48 @@ test("`tabbridge mcp` lists every tool and relays a call (built bridge, real MCP
   child.kill();
   host.stop();
 });
+
+test("two Chromes: each host takes its own slot, agents list them and switch by name", async () => {
+  isolate();
+  const first = await startHost();
+  first.toHost.write(encodeNative({ type: "label", label: "Work Chrome" }));
+  const second = await startHost({ reply: () => ({ content: [{ type: "text", text: "from the second" }] }) });
+  second.toHost.write(encodeNative({ type: "label", label: "Testing profile" }));
+  await new Promise((r) => setTimeout(r, 100));
+
+  const client = new BridgeClient("agent");
+  const list = await client.browsers();
+  assert.deepEqual(list.map((b) => [b.slot, b.label, b.selected]), [[1, "Work Chrome", true], [2, "Testing profile", false]]);
+  assert.match(((await client.call("tabs_list", {})).content[0] as any).text, /ran tabs_list/);
+  await client.selectBrowser("testing");
+  assert.equal(((await client.call("tabs_list", {})).content[0] as any).text, "from the second");
+  await assert.rejects(client.selectBrowser("Firefox"), /No running Chrome called "Firefox"/);
+  client.close();
+  first.stop();
+  second.stop();
+});
+
+test("TABBRIDGE_BROWSER pins a client to one Chrome; if that one isn't running it says so", async () => {
+  isolate();
+  const host = await startHost();
+  host.toHost.write(encodeNative({ type: "label", label: "Work Chrome" }));
+  await new Promise((r) => setTimeout(r, 50));
+  process.env.TABBRIDGE_BROWSER = "Home Chrome";
+  const pinned = new BridgeClient("agent");
+  const r = await pinned.call("tabs_list", {}, 3000);
+  delete process.env.TABBRIDGE_BROWSER;
+  assert.equal(r.isError, true);
+  pinned.close();
+  host.stop();
+});
+
+test("file_upload paths are made absolute and must exist, before Chrome is asked", async () => {
+  const { prepareUpload, isResult } = await import("../bridge/src/bridge-tools.ts");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tabbridge-up-"));
+  fs.writeFileSync(path.join(dir, "a.txt"), "x");
+  const ok = prepareUpload({ ref: "e1", paths: ["a.txt"] }, dir) as any;
+  assert.ok(!isResult(ok));
+  assert.equal(ok.paths[0], path.join(dir, "a.txt"));
+  const missing = prepareUpload({ ref: "e1", paths: ["nope.txt"] }, dir);
+  assert.ok(isResult(missing) && missing.isError);
+});

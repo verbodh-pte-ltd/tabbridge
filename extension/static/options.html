@@ -12,6 +12,11 @@
     <label class="toggle"><input type="checkbox" id="notify"><span><b>Show desktop notifications.</b><br><span class="muted">When TabBridge waits for your answer, and when you send a page to your agent.</span></span></label>
   </section>
   <section class="card">
+    <h2>This browser's name</h2>
+    <p class="muted">When TabBridge runs in more than one Chrome or profile, agents pick one by this name.</p>
+    <div class="row"><input id="browserName" type="text" maxlength="40" style="flex:1;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg)" aria-label="This browser's name"><button id="saveName">Save</button></div>
+  </section>
+  <section class="card">
     <h2>Guards (on by default)</h2>
     <label class="toggle"><input type="checkbox" id="confirmRisky"><span><b>Ask before a risky click or Enter.</b><br><span class="muted">Anything labelled send, submit, buy, pay, order, delete, publish, post, transfer, confirm and similar.</span></span></label>
     <label class="toggle"><input type="checkbox" id="hideSecrets"><span><b>Hide secret values from agents.</b><br><span class="muted">Cookie values, Authorization headers, and storage keys that look like tokens or sessions. Off: agents can read them, which lets them act as you elsewhere.</span></span></label>
