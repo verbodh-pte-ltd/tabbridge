@@ -1,0 +1,9 @@
+node_modules/
+bridge/dist/
+extension/dist/
+store/*.zip
+*.log
+.env
+*.pem
+bridge/README.md
+bridge/LICENSE

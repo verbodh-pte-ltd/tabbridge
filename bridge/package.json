@@ -1,0 +1,16 @@
+{
+  "name": "tabbridge",
+  "version": "0.1.0",
+  "description": "Lets any AI agent (Claude Code, Codex, Gemini CLI, Cursor…) use your own Chrome through MCP. The bridge for the TabBridge extension.",
+  "type": "module",
+  "bin": { "tabbridge": "dist/cli.js" },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=20" },
+  "keywords": ["mcp", "chrome", "browser", "agent", "claude", "codex", "gemini", "automation"],
+  "repository": { "type": "git", "url": "git+https://github.com/verbodh-pte-ltd/tabbridge.git" },
+  "homepage": "https://github.com/verbodh-pte-ltd/tabbridge#readme",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  }
+}

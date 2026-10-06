@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>TabBridge settings</title><link rel="stylesheet" href="styles.css"><style>main{max-width:640px;margin:0 auto;padding-block:24px}</style></head>
+<body>
+<main>
+  <h1>TabBridge settings</h1>
+  <p class="muted">Everything is allowed by default. Turn off what you don't want.</p>
+  <section class="card">
+    <h2>What agents may do</h2>
+    <label class="toggle"><input type="checkbox" id="allSites"><span><b>Use any site without asking.</b><br><span class="muted">Off: you're asked the first time an agent uses each site (allow once, always, or block).</span></span></label>
+    <label class="toggle"><input type="checkbox" id="sharedGroup"><span><b>Keep every agent's tabs in one "TabBridge" group.</b><br><span class="muted">Off: each agent gets a group of its own. Either way, an agent can't use another agent's tabs.</span></span></label>
+    <label class="toggle"><input type="checkbox" id="notify"><span><b>Show desktop notifications.</b><br><span class="muted">When TabBridge waits for your answer, and when you send a page to your agent.</span></span></label>
+  </section>
+  <section class="card">
+    <h2>Guards (on by default)</h2>
+    <label class="toggle"><input type="checkbox" id="confirmRisky"><span><b>Ask before a risky click or Enter.</b><br><span class="muted">Anything labelled send, submit, buy, pay, order, delete, publish, post, transfer, confirm and similar.</span></span></label>
+    <label class="toggle"><input type="checkbox" id="hideSecrets"><span><b>Hide secret values from agents.</b><br><span class="muted">Cookie values, Authorization headers, and storage keys that look like tokens or sessions. Off: agents can read them, which lets them act as you elsewhere.</span></span></label>
+  </section>
+  <section class="card">
+    <h2>Chrome's own switches</h2>
+    <p class="muted">Chrome doesn't let an extension turn these on for itself. Turn them on in Chrome's page for TabBridge if you want them.</p>
+    <ul>
+      <li class="row"><span>Allow in Incognito</span><b id="incognito">…</b></li>
+      <li class="row"><span>Allow access to file URLs</span><b id="files">…</b></li>
+    </ul>
+    <div class="actions"><button id="open-chrome">Open Chrome's TabBridge page</button></div>
+  </section>
+  <section class="card">
+    <h2>Sites</h2>
+    <ul id="sites"><li class="muted">No sites yet. They appear here after you answer "Always allow" or "Block".</li></ul>
+  </section>
+  <section class="card">
+    <h2>Connect an agent</h2>
+    <p>Install the host once, then add TabBridge to your agent:</p>
+    <p><code>npx tabbridge install</code></p>
+    <p><code>claude mcp add tabbridge -- npx -y tabbridge mcp</code></p>
+    <p class="muted">For Codex, Gemini CLI, Cursor and others run <code>npx tabbridge config codex</code> (or gemini, cursor, json).</p>
+  </section>
+</main>
+<script type="module" src="options.js"></script>
+</body>
+</html>
