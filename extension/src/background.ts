@@ -4,7 +4,7 @@
 import { HOST_NAME, PROTOCOL_VERSION, type HostToExtension } from "../../bridge/src/shared/protocol.ts";
 import { setUpMenus } from "./capture.ts";
 import { endSession } from "./permissions.ts";
-import { allSessions, closeSession, getSession, groupTabs, openSession } from "./sessions.ts";
+import { allSessions, closeSession, getSession, groupTabs, openSession, setConnected } from "./sessions.ts";
 import { browserLabel, type Status } from "./settings.ts";
 import { runTool } from "./tools.ts";
 
@@ -18,8 +18,13 @@ async function publish(patch: Partial<Status> = {}): Promise<void> {
   })));
   status = { ...status, ...patch, sessions };
   await chrome.storage.session.set({ status });
-  await chrome.action.setBadgeText({ text: status.connected ? (sessions.length ? String(sessions.length) : "") : "!" });
+  // ✓ while connected, ! when not; the tooltip says how many agents are working.
+  await chrome.action.setBadgeText({ text: status.connected ? "✓" : "!" });
   await chrome.action.setBadgeBackgroundColor({ color: status.connected ? "#2f6f4e" : "#b3261e" });
+  await chrome.action.setBadgeTextColor?.({ color: "#ffffff" });
+  const agents = sessions.length === 1 ? "1 agent working" : `${sessions.length} agents working`;
+  await chrome.action.setTitle({ title: status.connected ? `TabBridge: connected · ${agents}` : `TabBridge: not connected · ${status.error ?? "open the popup"}` });
+  await setConnected(status.connected);
 }
 
 function connect(): void {

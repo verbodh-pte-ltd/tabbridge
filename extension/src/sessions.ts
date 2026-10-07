@@ -15,7 +15,27 @@ export interface Session {
 
 const sessions = new Map<string, Session>();
 let sharedGroupId: number | undefined;
-const COLORS: `${chrome.tabGroups.Color}`[] = ["blue", "purple", "cyan", "green", "orange", "pink", "yellow", "red"];
+// Chrome offers 9 fixed group colours. Orange is the closest to VerBodh's warm sunrise gold.
+export const BRAND_COLOR: `${chrome.tabGroups.Color}` = "orange";
+const COLORS: `${chrome.tabGroups.Color}`[] = ["orange", "blue", "purple", "cyan", "green", "pink", "yellow", "red"];
+const CHECK = " ✓";
+let connected = false;
+
+/** "TabBridge ✓" while the bridge is connected; the plain name when it isn't. */
+export function groupTitle(name: string): string {
+  return connected ? name + CHECK : name;
+}
+
+/** Marks every TabBridge tab group as connected or not. Called when the native connection opens or drops. */
+export async function setConnected(on: boolean): Promise<void> {
+  connected = on;
+  for (const g of await chrome.tabGroups.query({})) {
+    const base = (g.title ?? "").replace(/ ✓$/, "");
+    if (base === "TabBridge" || base.startsWith("TabBridge · ")) {
+      await chrome.tabGroups.update(g.id, { title: groupTitle(base) }).catch(() => {});
+    }
+  }
+}
 
 export function openSession(session: string, client: string): Session {
   const s = sessions.get(session) ?? { session, client, tabs: new Set<number>() };
@@ -81,11 +101,11 @@ export async function addToGroup(s: Session, tabId: number): Promise<void> {
   const id = await chrome.tabs.group({ tabIds: [tabId] });
   if (shared) {
     sharedGroupId = id;
-    await chrome.tabGroups.update(id, { title: "TabBridge", color: "green", collapsed: false });
+    await chrome.tabGroups.update(id, { title: groupTitle("TabBridge"), color: BRAND_COLOR, collapsed: false });
   } else {
     s.groupId = id;
     const color = COLORS[allSessions().indexOf(s) % COLORS.length] ?? "blue";
-    await chrome.tabGroups.update(id, { title: `TabBridge · ${s.client}`, color, collapsed: false });
+    await chrome.tabGroups.update(id, { title: groupTitle(`TabBridge · ${s.client}`), color, collapsed: false });
   }
 }
 
@@ -118,7 +138,7 @@ export async function shareTab(tabId: number): Promise<boolean> {
     await chrome.tabs.group({ groupId: sharedGroupId, tabIds: [tabId] });
   } else {
     sharedGroupId = await chrome.tabs.group({ tabIds: [tabId] });
-    await chrome.tabGroups.update(sharedGroupId, { title: "TabBridge", color: "green", collapsed: false });
+    await chrome.tabGroups.update(sharedGroupId, { title: groupTitle("TabBridge"), color: BRAND_COLOR, collapsed: false });
   }
   return true;
 }

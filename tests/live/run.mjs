@@ -91,7 +91,15 @@ try {
 
   await check("the tab sits in one group named TabBridge", async () => {
     const groups = await chrome.extEval(`chrome.tabGroups.query({}).then(gs => gs.map(g => g.title))`);
-    expect(groups.length === 1 && groups[0] === "TabBridge", JSON.stringify(groups));
+    expect(groups.length === 1 && groups[0] === "TabBridge ✓", JSON.stringify(groups));
+    const color = await chrome.extEval(`chrome.tabGroups.query({}).then(gs => gs[0].color)`);
+    expect(color === "orange", `group colour ${color}`);
+  });
+
+  await check("the toolbar icon shows ✓ while connected, and the tooltip names the agents", async () => {
+    const badge = await chrome.extEval(`chrome.action.getBadgeText({})`);
+    const title = await chrome.extEval(`chrome.action.getTitle({})`);
+    expect(badge === "✓" && /connected · \d+ agents? working/.test(title), `${badge} | ${title}`);
   });
 
   await check("read_page lists controls with refs, wrapped as untrusted", async () => {
