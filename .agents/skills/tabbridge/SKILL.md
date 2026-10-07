@@ -46,8 +46,9 @@ If more than one Chrome runs TabBridge, `browsers` lists them by name; pick with
 
 ## 4. When TabBridge asks the person
 
-Clicks or Enter on anything like send, submit, buy, pay, delete, publish, post, transfer, confirm,
-and every file upload, open an approval window for the person. Your call waits up to 2 minutes.
+YOLO mode is on at first, and then TabBridge asks nothing. When the person switches it off, clicks or
+Enter on anything like send, submit, buy, pay, delete, publish, post, transfer, confirm, and every
+file upload, ask the person in the TabBridge pane by the toolbar icon. Your call waits up to 2 minutes.
 
 - **"The user did not allow…" is final.** Don't retry, don't reach the same result another way
   (a different button, a script, a keyboard shortcut). Tell the person what you were trying to do.

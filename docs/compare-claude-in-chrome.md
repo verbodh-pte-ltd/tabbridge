@@ -1,15 +1,15 @@
 # TabBridge compared with Claude in Chrome
 
-**Short answer.** TabBridge 0.1.1 does everything Claude in Chrome does for an agent, except run
+**Short answer.** TabBridge 0.2.0 does everything Claude in Chrome does for an agent, except run
 Claude's own saved shortcuts, and adds the owner's features on top. Claude in Chrome's code isn't
 public, so TabBridge is written from scratch to do the same job, for any agent rather than only Claude.
 
-All of this is checked by the live test in real Chrome (53 of 53 checks pass), except where a row
+All of this is checked by the live test in real Chrome (60 of 60 checks pass at 0.2.0), except where a row
 says otherwise.
 
 ## Capabilities side by side
 
-| Capability | Claude in Chrome | TabBridge 0.1.1 |
+| Capability | Claude in Chrome | TabBridge 0.2.0 |
 | --- | --- | --- |
 | **Which agents can use it** | Claude only | Any MCP agent (Claude Code, Codex, Gemini CLI, Cursor…), plus `tabbridge call` from scripts and apps |
 | **Tabs** | tabs_context, tabs_create, tabs_close | tabs_list, tab_create, tab_select, tab_close |
@@ -51,5 +51,5 @@ says otherwise.
 ## Not proven yet
 
 - A real Claude Code or Codex session driving TabBridge (the owner paused that check).
-- Mac and Linux install; Edge and Brave.
-- The Web Store build: 0.1.0 is pending review; 0.1.1 is built but not uploaded.
+- The live test on a Mac (install and connection on a Mac work: `tabbridge doctor` all ✓); Linux; Edge and Brave.
+- The Web Store build: 0.1.0 is pending review; 0.2.0 is built (`store/tabbridge-0.2.0.zip`) but not uploaded.

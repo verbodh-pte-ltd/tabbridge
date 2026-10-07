@@ -46,6 +46,7 @@ session ids are hidden from agents. You can change this in TabBridge's settings.
 | downloads | Telling the agent where a file it downloaded was saved |
 | contextMenus | The right-click "Send to my agent" menu |
 | alarms | Reconnecting to the TabBridge program if Chrome paused the extension |
+| sidePanel | The live console: each step an agent takes, its questions, and notes you send to your agent |
 
 ## Contact
 

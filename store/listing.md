@@ -25,10 +25,11 @@ What an agent can do
 • See what DevTools sees: console, network requests with headers and bodies, elements and styles, storage, cookies, IndexedDB, cache, service workers, performance and security
 • page_report: everything about a broken page in one call
 • Right-click any page or element and choose "Send to my agent"
+• Watch each step your agent takes in the live console (Chrome's side panel), and send it a note
 
 You stay in charge
 • Agents only use their own tabs, kept in a TabBridge tab group
-• Risky clicks (send, buy, pay, delete, publish…) ask you first
+• YOLO mode is on at first; switch it off and risky clicks (send, buy, pay, delete, publish…) ask you first
 • Cookie values and tokens are hidden from agents unless you allow them
 • Optionally, be asked before an agent uses each new site
 • Everything stays on your computer: TabBridge has no server
@@ -63,6 +64,7 @@ Lets AI agents that the user runs on their own computer control and read the use
 | tabGroups | Keeps every tab an agent uses in one "TabBridge" group, so the user can see which tabs agents control and agents can't use other tabs. |
 | scripting | Reads the page's elements and text, and fills in form fields, on the page the agent is working on. |
 | storage | Saves the user's TabBridge settings and the sites they allowed or blocked. |
+| sidePanel | Shows the live console: each step the agent takes in this browser, its questions, and a box where the user sends a note to their agent. |
 | notifications | Tells the user when TabBridge is waiting for their approval, and confirms when they sent a page to their agent. |
 | downloads | Tells the agent where a file it downloaded was saved and whether the download finished. |
 | contextMenus | Adds "Send this page / element to my agent" to the right-click menu. |
