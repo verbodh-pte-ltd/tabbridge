@@ -30,13 +30,13 @@ Until TabBridge is on npm and the Chrome Web Store, install it from the
 1. **The bridge, once per computer:**
 
    ```
-   npm install -g https://github.com/verbodh-pte-ltd/tabbridge/releases/download/v0.1.1/tabbridge-0.1.1.tgz
+   npm install -g https://github.com/verbodh-pte-ltd/tabbridge/releases/download/v0.2.0/tabbridge-0.2.0.tgz
    tabbridge install
    ```
 
    `tabbridge install` registers the small host program Chrome talks to. Nothing runs until the
    extension starts it.
-2. **The extension:** download `tabbridge-extension-0.1.1.zip` from the release and unzip it.
+2. **The extension:** download `tabbridge-extension-0.2.0.zip` from the release and unzip it.
    Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the
    unzipped folder.
 3. **Connect your agent:**
@@ -123,11 +123,11 @@ Each Chrome (or profile) running TabBridge gets its own slot. Name each one in T
 ## Safety
 
 Everything is allowed by default, and each permission can be turned off in TabBridge's settings.
-Two guards stay on unless you turn them off:
 
-- **Risky actions ask first.** A click or Enter on anything labelled send, submit, buy, pay, order,
-  delete, publish, post, transfer, confirm and similar opens a small window: Allow or Don't allow.
-  No answer in 2 minutes means no.
+- **Risky actions ask first, when YOLO mode is off.** YOLO mode is on at first. Switch it off in the
+  pane, the side panel or settings. Then a click or Enter on anything labelled send, submit, buy,
+  pay, order, delete, publish, post, transfer, confirm and similar, and every file upload, asks in
+  the pane by the TabBridge icon: Allow or Don't allow. No answer in 2 minutes means no.
 - **Secrets stay hidden.** Cookie values, Authorization headers and token-like storage values are
   shown to agents as "(hidden)".
 
