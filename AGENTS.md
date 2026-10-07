@@ -31,6 +31,7 @@ npm run build                     # bridge/dist + extension/dist; syncs the vers
 npm test                          # unit tests
 node bridge/dist/cli.js install   # register the host for this user (needed for the live test)
 npm run test:live                 # real Chrome, throwaway profiles, every tool
+TABBRIDGE_HEADLESS=1 npm run test:live   # the same with no window on the screen
 npm run package:store             # store/tabbridge-<version>.zip, without the dev "key"
 node scripts/demo-gif.mjs         # re-record docs/demo.gif and docs/demo-steps/
 ```
@@ -69,8 +70,11 @@ files the tests import).
   (`Extensions.loadUnpacked` over `--remote-debugging-pipe`).
 - Chrome refuses every extension on Web Store pages. Use the DevTools protocol there, not the extension.
 - One host per Chrome; several Chromes take slots 1–9, named in Settings, listed by `browsers`.
-- The live test pins its calls to its own named test browser, so it is safe while TabBridge runs in
-  the developer's everyday Chrome.
+- The live test and the store screenshots pin their calls to their own named test browser, so they are
+  safe while TabBridge runs in the developer's everyday Chrome. A new script that drives a test
+  Chrome must do the same (`TABBRIDGE_BROWSER`), or it acts in the everyday Chrome.
+- On macOS and Linux, Chrome looks for native hosts inside `--user-data-dir`; `tests/live/chrome.mjs`
+  copies the host file into each throwaway profile.
 
 ## Git
 

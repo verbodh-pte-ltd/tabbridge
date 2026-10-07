@@ -53,7 +53,7 @@ const TOOLS = `<!doctype html><html><head><title>Acme widgets</title>
   addEventListener("mousemove", (e) => { if (startX !== null) knob.style.left = Math.max(0, e.clientX - startX) + "px"; });
   addEventListener("mouseup", (e) => { if (startX !== null) { log("slid " + Math.round(e.clientX - startX)); startX = null; } });
   file.onchange = () => log("files " + [...file.files].map(f => f.name).join(","));
-  mod.onclick = (e) => log(e.ctrlKey ? "ctrl click" : "plain click");
+  mod.onclick = (e) => log(e.shiftKey ? "shift click" : "plain click");
   let n = 0; setInterval(() => { document.getElementById("tick").textContent = "Tick " + (++n); }, 200);
 </script></body></html>`;
 

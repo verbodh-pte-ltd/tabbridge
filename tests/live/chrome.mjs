@@ -26,6 +26,13 @@ export function findChrome() {
 
 export async function launch(extensionDir) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "tabbridge-live-"));
+  // On macOS and Linux, Chrome looks for native hosts inside --user-data-dir, not in the everyday
+  // profile's folder where `tabbridge install` put it. Windows uses the registry instead.
+  if (process.platform !== "win32") {
+    const name = "com.verbodh.tabbridge.json";
+    fs.mkdirSync(path.join(profile, "NativeMessagingHosts"));
+    fs.copyFileSync(path.join(os.homedir(), ".tabbridge", name), path.join(profile, "NativeMessagingHosts", name));
+  }
   const child = spawn(findChrome(), [
     `--user-data-dir=${profile}`,
     "--remote-debugging-pipe",
@@ -34,6 +41,8 @@ export async function launch(extensionDir) {
     "--no-default-browser-check",
     "--disable-search-engine-choice-screen",
     "--window-size=1280,900",
+    // TABBRIDGE_HEADLESS=1: no window on the screen, so the test can run while someone works.
+    ...(process.env.TABBRIDGE_HEADLESS ? ["--headless=new"] : []),
     // The test window is often behind other windows. Chrome would stop drawing it, which drops
     // screencast frames and delays input; keep it drawing as if it were in front.
     "--disable-features=CalculateNativeWinOcclusion",

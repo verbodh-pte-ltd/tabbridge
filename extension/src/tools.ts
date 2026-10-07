@@ -4,7 +4,7 @@ import { whenTabsEditable } from "./retry.ts";
 import type { ToolResult } from "../../bridge/src/shared/protocol.ts";
 import { textResult } from "../../bridge/src/shared/protocol.ts";
 import * as cdp from "./cdp.ts";
-import { parseKeys } from "./keys.ts";
+import { macCommands, parseKeys } from "./keys.ts";
 import { checkRisky, checkSite } from "./permissions.ts";
 import { ACTION_HANDLERS } from "./actions.ts";
 import { INSPECT_HANDLERS } from "./inspect.ts";
@@ -252,7 +252,8 @@ export const HANDLERS: Record<string, Handler> = {
     }
     for (const p of presses) {
       const base = { key: p.key, code: p.code, windowsVirtualKeyCode: p.keyCode, nativeVirtualKeyCode: p.keyCode, modifiers: p.modifiers };
-      await cdp.send(tab.id!, "Input.dispatchKeyEvent", { ...base, type: p.text ? "keyDown" : "rawKeyDown", text: p.text, unmodifiedText: p.text });
+      await cdp.send(tab.id!, "Input.dispatchKeyEvent", { ...base, type: p.text ? "keyDown" : "rawKeyDown", text: p.text, unmodifiedText: p.text,
+        commands: /Mac/.test(navigator.userAgent) ? macCommands(p) : undefined });
       await cdp.send(tab.id!, "Input.dispatchKeyEvent", { ...base, type: "keyUp" });
     }
     await settle(tab.id!);
