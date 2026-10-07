@@ -61,3 +61,10 @@ function parseOne(combo: string): KeyPress {
     text: modifiers & ~8 ? undefined : isLetter ? (shifted ? upper : main.toLowerCase()) : main,
   };
 }
+
+/** Chrome on macOS runs no editing shortcut from a DevTools key event unless the command is named. */
+export function macCommands(p: KeyPress): string[] | undefined {
+  // ponytail: Select All only, the shortcut agents use to clear a field; add copy/paste/undo when a check needs them.
+  const ctrlOrMeta = (p.modifiers & 6) !== 0 && (p.modifiers & 9) === 0;
+  return ctrlOrMeta && p.code === "KeyA" ? ["selectAll"] : undefined;
+}

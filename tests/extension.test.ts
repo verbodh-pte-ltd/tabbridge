@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { BRIDGE_TOOLS, TOOL_NAMES } from "../bridge/src/shared/tools.ts";
-import { parseKeys } from "../extension/src/keys.ts";
+import { macCommands, parseKeys } from "../extension/src/keys.ts";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
@@ -31,6 +31,15 @@ test("keys: plain, combined and several presses", () => {
   assert.equal(parseKeys("Control++")[0].key, "+");
   assert.throws(() => parseKeys("Hyper+a"), /Unknown modifier/);
   assert.throws(() => parseKeys("Banana"), /Unknown key/);
+});
+
+test("keys on a Mac: Control+a and Meta+a also send Select All; other presses send no command", () => {
+  // Chrome on macOS runs no editing shortcut from a DevTools key event unless the command is named.
+  assert.deepEqual(macCommands(parseKeys("Control+a")[0]), ["selectAll"]);
+  assert.deepEqual(macCommands(parseKeys("Meta+a")[0]), ["selectAll"]);
+  assert.equal(macCommands(parseKeys("a")[0]), undefined);
+  assert.equal(macCommands(parseKeys("Shift+a")[0]), undefined);
+  assert.equal(macCommands(parseKeys("Control+b")[0]), undefined);
 });
 
 test("risky labels are caught, ordinary ones are not", async () => {

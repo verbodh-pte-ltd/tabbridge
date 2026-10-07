@@ -1,6 +1,6 @@
 {
   "name": "tabbridge",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Lets any AI agent (Claude Code, Codex, Gemini CLI, Cursor…) use your own Chrome through MCP. The bridge for the TabBridge extension.",
   "type": "module",
   "bin": { "tabbridge": "dist/cli.js" },

@@ -2,6 +2,7 @@
 // profile, against the local test site. Output: store/screenshots/NN-*.png
 //
 //   npm run build && node bridge/dist/cli.js install && node scripts/store-screenshots.mjs
+//   (TABBRIDGE_HEADLESS=1 in front: no window on the screen)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -14,9 +15,13 @@ const out = path.join(root, "store", "screenshots");
 fs.mkdirSync(out, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Pin every call to the test Chrome by name; otherwise the agent may drive your everyday Chrome.
+const LABEL = "tabbridge-store-shots";
+process.env.TABBRIDGE_BROWSER = LABEL;
 const site = await startSite();
 const chrome = await launch(path.join(root, "extension", "dist"));
 const agent = new BridgeClient("claude-code");
+await sleep(1500);
 
 async function shoot(url, file, setup) {
   const { targetId } = await chrome.cdp("Target.createTarget", { url: "about:blank" });
@@ -34,22 +39,26 @@ async function shoot(url, file, setup) {
 }
 
 try {
-  for (let i = 0; i < 40 && (await agent.call("tabs_list", {}, 3000)).isError; i++) { agent.close(); await sleep(250); }
-
-  // 1. The settings page: everything on by default, two guards.
+  // 1. The settings page as a new user sees it: taken before the test names this browser.
   await shoot(`chrome-extension://${chrome.extensionId}/options.html`, "01-settings.png",
     "document.body.style.background = getComputedStyle(document.body).backgroundColor");
+  await chrome.extEval(`chrome.storage.local.set({ settings: { browserName: ${JSON.stringify(LABEL)} } })`);
+  for (let i = 0; i < 40 && (await agent.call("tabs_list", {}, 3000)).isError; i++) { agent.close(); await sleep(250); }
 
-  // 2. A real risky-action question, drawn over the page it came from.
+
+  // 2. A real risky-action question, drawn over the page it came from. YOLO mode starts on and
+  // asks nothing, so switch it off first.
+  await chrome.extEval(`chrome.storage.local.set({ settings: { browserName: ${JSON.stringify(LABEL)}, yolo: false } })`);
   await agent.call("navigate", { url: site.url() });
   const send = (await agent.call("find", { query: "Send message" })).content[0].text.match(/\[(e\d+)\]/)[1];
   const pending = agent.call("click", { ref: send });
-  let approval;
-  for (let i = 0; i < 50 && !approval; i++) {
-    const { targetInfos } = await chrome.cdp("Target.getTargets");
-    approval = targetInfos.find((t) => t.url.includes("/popup.html"));
-    if (!approval) await sleep(100);
+  // Wait for the question, then open the pane's page as a normal page: the real pane (a toolbar
+  // popup) can't be resized for the picture, and headless Chrome may not open it at all.
+  for (let i = 0; i < 50; i++) {
+    if (await chrome.extEval(`chrome.storage.session.get("approvals").then(x => (x.approvals ?? []).length)`)) break;
+    await sleep(100);
   }
+  const approval = await chrome.cdp("Target.createTarget", { url: `chrome-extension://${chrome.extensionId}/popup.html`, background: true });
   // Extension pages can't be framed into a web page, so photograph the real window and lay the
   // picture over the page it belongs to.
   const { sessionId: pop } = await chrome.cdp("Target.attachToTarget", { targetId: approval.targetId, flatten: true });

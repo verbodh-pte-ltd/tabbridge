@@ -1,10 +1,11 @@
 // Live test: real Chrome, the real extension, the real installed host, a local test site.
 //
 //   npm run build && node bridge/dist/cli.js install && npm run test:live
+//   TABBRIDGE_HEADLESS=1 npm run test:live      # no window on the screen
 //
-// It uses a throwaway Chrome profile, so your own profile, tabs and sign-ins are not touched.
-// The host is the one `tabbridge install` registered, so the TabBridge extension must not be
-// running in your everyday Chrome at the same time (two hosts can't share the pipe).
+// It uses a throwaway Chrome profile, so your own profile, tabs and sign-ins are not touched. Each
+// Chrome gets its own host slot, and every call is pinned to the test browser by name, so it is
+// safe while TabBridge runs in your everyday Chrome.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -455,9 +456,10 @@ try {
     expect(sel.includes("Three little words here."), sel);
   });
 
-  await check("click with modifiers holds the key (Control)", async () => {
-    await b.call("click", { ...(await at(b, "mod")), modifiers: "Control" });
-    expect((await evs(b)).includes("ctrl click"), await evs(b));
+  // Shift, not Control: on a Mac, Control+click is a right-click and fires no click event.
+  await check("click with modifiers holds the key (Shift)", async () => {
+    await b.call("click", { ...(await at(b, "mod")), modifiers: "Shift" });
+    expect((await evs(b)).includes("shift click"), await evs(b));
   });
 
   await check("drag: HTML drag-and-drop lands in the drop zone", async () => {
