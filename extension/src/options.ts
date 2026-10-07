@@ -6,6 +6,7 @@ const BOXES: [string, keyof Settings, boolean][] = [
   ["sharedGroup", "sharedGroup", false],
   ["notify", "notify", false],
   ["confirmRisky", "confirmRisky", false],
+  ["yolo", "yolo", false],
   ["hideSecrets", "showSecrets", true],
 ];
 

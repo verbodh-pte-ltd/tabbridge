@@ -118,7 +118,7 @@ export const ACTION_HANDLERS: Record<string, Handler> = {
     const paths: string[] = Array.isArray(a.paths) ? a.paths : [];
     if (!paths.length) return textResult("file_upload needs paths.", true);
     const names = paths.map((p) => p.split(/[\\/]/).pop()).join(", ");
-    const refused = await checkRisky(s.client, tab.url, `upload ${names} from this computer`);
+    const refused = await checkRisky(s.client, tab, `upload ${names} from this computer`);
     if (refused) throw new Refused(refused);
     const objectId = await elementHandle(tab.id!, a);
     const isFileInput = await cdp.send(tab.id!, "Runtime.callFunctionOn", {

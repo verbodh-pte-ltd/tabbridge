@@ -62,9 +62,12 @@ export async function launch(extensionDir) {
     }
   });
 
+  // Every call has a time limit: a page that closes mid-call (the pane closes itself once
+  // answered) must fail a check, not hang the whole run.
   const cdp = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
     const id = nextId++;
-    waiting.set(id, { resolve, reject });
+    const timer = setTimeout(() => { waiting.delete(id); reject(new Error(`${method} got no answer in 15 s`)); }, 15_000);
+    waiting.set(id, { resolve: (v) => { clearTimeout(timer); resolve(v); }, reject: (e) => { clearTimeout(timer); reject(e); } });
     out.write(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }) + "\0");
   });
 
@@ -77,32 +80,62 @@ export async function launch(extensionDir) {
     try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); } catch { /* left in temp */ }
   }
 
-  /** Waits for a TabBridge approval window and clicks the button with this text. */
-  async function answerApproval(buttonText, timeoutMs = 15_000) {
+  /** Answers a TabBridge question by clicking the button with this text. It uses the toolbar
+   *  pane when it opens; the pane needs Chrome to be the window in front, which a desktop in use
+   *  may not allow, so after a few seconds it answers in the side panel page instead (the same
+   *  question, the same buttons). paneOnly: the pane itself is what is being tested. */
+  async function answerApproval(buttonText, timeoutMs = 15_000, { paneOnly = false } = {}) {
     const until = Date.now() + timeoutMs;
+    const start = Date.now();
+    let focused = false;
+    const clickIn = async (sessionId) => {
+      const { result } = await cdp("Runtime.evaluate", {
+        expression: `(() => { const b = [...document.querySelectorAll("[data-approval] button")].find(b => b.textContent.trim() === ${JSON.stringify(buttonText)}); if (!b) return ""; b.click(); return "clicked"; })()`,
+        returnByValue: true,
+      }, sessionId).catch(() => ({ result: {} }));
+      return result.value === "clicked";
+    };
     while (Date.now() < until) {
       const { targetInfos } = await cdp("Target.getTargets");
-      const target = targetInfos.find((t) => t.type === "page" && t.url.includes(`${extensionId}/approve.html`));
+      const target = targetInfos.find((t) => t.url.includes(`${extensionId}/popup.html`));
+      if (!target && !focused && Date.now() - start > 1500) {
+        focused = true;
+        await extEval(`chrome.windows.getAll({ windowTypes: ["normal"] }).then((ws) => { const w = ws.find((x) => x.type === "normal"); return w && chrome.windows.update(w.id, { focused: true }); })`).catch(() => {});
+      }
       if (target) {
-        const { sessionId } = await cdp("Target.attachToTarget", { targetId: target.targetId, flatten: true });
-        for (let i = 0; i < 40; i++) {
-          const { result } = await cdp("Runtime.evaluate", {
-            expression: `(() => { const b = [...document.querySelectorAll("button")].find(b => b.textContent === ${JSON.stringify(buttonText)}); if (!b) return document.getElementById("title")?.textContent || ""; b.click(); return "clicked"; })()`,
-            returnByValue: true,
-          }, sessionId);
-          if (result.value === "clicked") return;
+        // The pane found may be the previous one closing itself: try it for a moment, then look again.
+        const { sessionId } = await cdp("Target.attachToTarget", { targetId: target.targetId, flatten: true }).catch(() => ({}));
+        for (let i = 0; sessionId && i < 15; i++) {
+          if (await clickIn(sessionId)) return "pane";
           await new Promise((r) => setTimeout(r, 100));
         }
-        throw new Error(`Approval window had no "${buttonText}" button`);
+      } else if (!paneOnly && Date.now() - start > 4000) {
+        const { targetId } = await cdp("Target.createTarget", { url: `chrome-extension://${extensionId}/sidepanel.html`, background: true });
+        try {
+          const { sessionId } = await cdp("Target.attachToTarget", { targetId, flatten: true });
+          for (let i = 0; i < 50; i++) {
+            if (await clickIn(sessionId)) return "side panel";
+            await new Promise((r) => setTimeout(r, 100));
+          }
+        } finally {
+          await cdp("Target.closeTarget", { targetId }).catch(() => {});
+        }
       }
       await new Promise((r) => setTimeout(r, 150));
     }
-    throw new Error(`No approval window appeared within ${timeoutMs} ms`);
+    const waiting = await extEval(`chrome.storage.session.get("approvals").then(x => (x.approvals || []).map(a => a.kind + ": " + a.detail).join(" | "))`).catch(() => "?");
+    throw new Error(`No "${buttonText}" for a question appeared in TabBridge within ${timeoutMs} ms (waiting: ${waiting || "nothing"})`);
   }
 
+  /** True while TabBridge is waiting for an answer (in the pane or the fallback window). */
   async function approvalOpen() {
+    return (await extEval(`chrome.storage.session.get("approvals").then(x => (x.approvals ?? []).length)`)) > 0;
+  }
+
+  /** The toolbar pane, if it is open: its target id. */
+  async function paneTarget() {
     const { targetInfos } = await cdp("Target.getTargets");
-    return targetInfos.some((t) => t.url.includes(`${extensionId}/approve.html`));
+    return targetInfos.find((t) => t.url.includes(`${extensionId}/popup.html`))?.targetId ?? null;
   }
 
   /** Runs an expression inside the extension (an extension page), for settings and tab groups. */
@@ -133,5 +166,5 @@ export async function launch(extensionDir) {
     return result.value;
   }
 
-  return { cdp, extensionId, close, answerApproval, approvalOpen, extEval };
+  return { cdp, extensionId, close, answerApproval, approvalOpen, paneTarget, extEval };
 }

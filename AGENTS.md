@@ -47,9 +47,11 @@ files the tests import).
 2. **Test first, then change.** A unit test for logic; a live check for anything that happens in the
    browser. Run `npm test` and `npm run test:live`; report the counts, and any check that failed.
    Type checks and a build are not proof a tool works.
-3. **Safety defaults stay on:** the risky-action question (`RISKY` in `permissions.ts`), hidden secrets
-   in `inspect.ts`, agents limited to their own tabs (`sessions.ts`), and `<untrusted-page-content>`
-   around everything read from a page. Changing any of these needs an issue and the maintainer's yes.
+3. **Safety defaults stay on:** hidden secrets in `inspect.ts`, agents limited to their own tabs
+   (`sessions.ts`), blocked sites staying blocked, and `<untrusted-page-content>` around everything
+   read from a page. The risky-action question (`RISKY` in `permissions.ts`) is there but YOLO mode
+   (`Settings.yolo`) starts on, by the maintainer's decision; the user switches it off in the pane,
+   side panel or settings. Changing any of these needs an issue and the maintainer's yes.
 4. **Input tools bring their tab to the front** (`foreground`): Chrome drops mouse and key events
    sent to a background tab.
 5. **Never type secrets in tests or demos.** Test pages use made-up names (Acme). The repo is public:

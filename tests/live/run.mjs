@@ -22,14 +22,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const text = (r) => r.content.filter((c) => c.type === "text").map((c) => c.text).join("\n");
 const unwrap = (t) => t.replace(/<\/?untrusted-page-content[^>]*>/g, "").trim();
 const only = process.argv[2] ? new RegExp(process.argv[2], "i") : null;
+// TABBRIDGE_SKIP="regex" leaves matching checks out, to find which one disturbs a later one.
+const skip = process.env.TABBRIDGE_SKIP ? new RegExp(process.env.TABBRIDGE_SKIP, "i") : null;
 
 async function check(name, fn) {
   if (only && !only.test(name)) return;
+  if (skip && skip.test(name)) return;
   try {
     await fn();
-    results.push([name, true, ""]);
+    results.push([name, true, ""]); console.error(`... pass  ${name}`);
   } catch (err) {
-    results.push([name, false, err?.message ?? String(err)]);
+    results.push([name, false, err?.message ?? String(err)]); console.error(`... FAIL  ${name}: ${err?.message ?? err}`);
   }
 }
 function expect(cond, msg) { if (!cond) throw new Error(String(msg).slice(0, 600)); }
@@ -120,6 +123,16 @@ try {
     expect(nextRef && sendRef && nameRef && teamRef && newsRef, `${nextRef} ${sendRef} ${nameRef} ${teamRef} ${newsRef}`);
   });
 
+  await check("YOLO mode is on by default: a risky click goes ahead without a question", async () => {
+    const r = await a.call("click", { ref: sendRef });
+    expect(!r.isError, text(r));
+    expect(!(await chrome.approvalOpen()), "asked although YOLO mode is on by default");
+    // The rest of the run checks the questions, so it switches YOLO mode off, as a user would,
+    // and clears the page's "Message sent" so later checks start clean.
+    await settings(chrome, { yolo: false });
+    await a.call("javascript", { code: "out.textContent = ''" });
+  });
+
   await check("click on an ordinary button: no question asked", async () => {
     const r = await a.call("click", { ref: nextRef });
     expect(!r.isError, text(r));
@@ -167,13 +180,102 @@ try {
     expect((await pending).isError, "Enter went through without asking");
   });
 
-  await check("closing the approval window counts as no", async () => {
+  await check("the question opens in the toolbar pane, and the badge counts it", async () => {
+    const click = a.call("click", { ref: sendRef });
+    // Wait for the question itself first: the previous pane may still be closing.
+    for (let i = 0; i < 50 && !(await chrome.approvalOpen()); i++) await sleep(100);
+    let badge = "";
+    for (let i = 0; i < 30 && badge !== "1"; i++) { badge = await chrome.extEval(`chrome.action.getBadgeText({})`); await sleep(100); }
+    expect(badge === "1", `badge: ${badge}`);
+    await chrome.answerApproval("Don't allow", 15_000, { paneOnly: true });
+    expect((await click).isError, "went ahead after Don't allow");
+    let after = "";
+    for (let i = 0; i < 30 && after !== "✓"; i++) { after = await chrome.extEval(`chrome.action.getBadgeText({})`); await sleep(100); }
+    expect(after === "✓", `badge did not go back to ✓: ${after}`);
+  });
+
+  await check("closing the pane keeps the question; reopening it lets you answer", async () => {
     const click = a.call("click", { ref: sendRef });
     for (let i = 0; i < 50 && !(await chrome.approvalOpen()); i++) await sleep(100);
-    const { targetInfos } = await chrome.cdp("Target.getTargets");
-    const t = targetInfos.find((x) => x.url.includes("/approve.html"));
-    await chrome.cdp("Target.closeTarget", { targetId: t.targetId });
-    expect((await click).isError, "went ahead after the window was closed");
+    await sleep(800);  // let any earlier pane finish closing and the new one open
+    let pane = null;
+    for (let i = 0; i < 50 && !(pane = await chrome.paneTarget()); i++) await sleep(100);
+    expect(pane, "the TabBridge pane did not open");
+    await chrome.cdp("Target.closeTarget", { targetId: pane });
+    await sleep(500);
+    expect(await chrome.approvalOpen(), "closing the pane answered the question");
+    // What a user does: click the TabBridge icon (here: focus the window, then open the pane).
+    await chrome.extEval(`chrome.windows.getAll({ windowTypes: ["normal"] }).then(async (ws) => { await chrome.windows.update(ws[0].id, { focused: true }); await chrome.action.openPopup({ windowId: ws[0].id }).catch(() => {}); })`);
+    await chrome.answerApproval("Don't allow");
+    expect((await click).isError, "went ahead after Don't allow");
+  });
+
+  // The side panel page, opened as a tab: Chrome only opens the real side panel after a click.
+  async function consolePage() {
+    const { targetId } = await chrome.cdp("Target.createTarget", { url: `chrome-extension://${chrome.extensionId}/sidepanel.html`, background: true });
+    const { sessionId } = await chrome.cdp("Target.attachToTarget", { targetId, flatten: true });
+    const run = async (expression) => (await chrome.cdp("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }, sessionId)).result.value;
+    for (let i = 0; i < 50 && !(await run("!!document.querySelector('main')")); i++) await sleep(100);
+    return { run, close: () => chrome.cdp("Target.closeTarget", { targetId }) };
+  }
+
+  await check("live console: each agent step shows, typed text does not", async () => {
+    await a.call("click", { ref: nextRef });
+    await a.call("javascript", { code: "document.getElementById('msg').focus()" });
+    await a.call("type", { text: "hunter2-not-shown" });
+    const page = await consolePage();
+    try {
+      let text = "";
+      for (let i = 0; i < 30 && !/Typed 17 characters/.test(text); i++) { text = await page.run("document.body.innerText"); await sleep(100); }
+      expect(/Clicked e\d+/.test(text) && /Typed 17 characters/.test(text), text.slice(0, 600));
+      expect(!text.includes("hunter2"), "typed text is shown in the console");
+    } finally { await page.close(); }
+  });
+
+  await check("live console: a note reaches the agent through user_captures, as the user's own words", async () => {
+    await a.call("user_captures", {});  // start empty
+    const page = await consolePage();
+    try {
+      await page.run(`(async () => {
+        const t = document.querySelector("textarea");
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(t, "Acme note: the Send button looks wrong");
+        t.dispatchEvent(new Event("input", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 100));
+        document.querySelector("form button[type=submit]").click();
+      })()`);
+      let shown = "";
+      for (let i = 0; i < 50 && !/Sent/.test(shown); i++) { shown = await page.run("document.body.innerText"); await sleep(100); }
+      expect(/Sent\. Ask your agent/.test(shown), shown);
+    } finally { await page.close(); }
+    const r = text(await a.call("user_captures", {}));
+    expect(/Note from the user \(typed in the TabBridge side panel\): Acme note: the Send button looks wrong/.test(r), r);
+    expect(!/<untrusted-page-content[^>]*>[^<]*Acme note/.test(r), "the user's note was wrapped as page content");
+  });
+
+  await check("YOLO mode: a risky click goes ahead with no question; off asks again", async () => {
+    await chrome.extEval(`chrome.runtime.sendMessage({ type: "set_yolo", on: true })`);
+    try {
+      const r = await a.call("click", { ref: sendRef });
+      expect(!r.isError, text(r));
+      expect(!(await chrome.approvalOpen()), "asked although YOLO mode is on");
+    } finally {
+      await chrome.extEval(`chrome.runtime.sendMessage({ type: "set_yolo", on: false })`);
+    }
+    const click = a.call("click", { ref: sendRef });
+    await chrome.answerApproval("Don't allow");
+    expect((await click).isError, "went ahead after Don't allow with YOLO off");
+  });
+
+  await check("'Allow, and stop asking' allows this click and turns YOLO mode on", async () => {
+    const click = a.call("click", { ref: sendRef });
+    await chrome.answerApproval("Allow, and stop asking");
+    try {
+      expect(!(await click).isError, "the click didn't go ahead");
+      const s = await chrome.extEval(`chrome.storage.local.get("settings").then(x => x.settings.yolo)`);
+      expect(s === true, `yolo: ${s}`);
+    } finally {
+      await chrome.extEval(`chrome.runtime.sendMessage({ type: "set_yolo", on: false })`);
+    }
   });
 
   await check("screenshot returns a JPEG of the page", async () => {
@@ -293,7 +395,7 @@ try {
 
   await check("'Allow once' is per agent: another agent is asked again; 'Always allow' is remembered", async () => {
     const pending = a.call("navigate", { url: site.other() });
-    await chrome.answerApproval("Always allow this site");
+    await chrome.answerApproval("Always allow");
     expect(!(await pending).isError, "refused");
     const again = await b.call("navigate", { url: site.other("/second") });
     expect(!again.isError && !(await chrome.approvalOpen()), "asked again");
@@ -301,12 +403,12 @@ try {
 
   await check("'Block' refuses the site, and keeps refusing without asking", async () => {
     const pending = a.call("navigate", { url: site.third() });
-    await chrome.answerApproval("Block");
+    await chrome.answerApproval("Block this site");
     expect((await pending).isError, "the blocked site loaded");
     const again = await b.call("navigate", { url: site.third("/second") });
     expect(again.isError && /blocked/.test(text(again)), text(again));
     expect(!(await chrome.approvalOpen()), "asked again about a blocked site");
-    await chrome.extEval(`chrome.storage.local.set({ settings: { browserName: ${JSON.stringify(LABEL)} }, sites: {} })`);
+    await chrome.extEval(`chrome.storage.local.set({ settings: { browserName: ${JSON.stringify(LABEL)}, yolo: false }, sites: {} })`);
   });
 
   await check("tabbridge call (one-shot CLI) reuses the open tab and saves screenshots as a numbered guide", async () => {

@@ -14,10 +14,22 @@
     "package:release": "npm run build && node scripts/package-store.mjs --unpacked && node scripts/package-store.mjs && npm pack --workspace bridge --pack-destination store"
   },
   "devDependencies": {
+    "@radix-ui/react-slot": "^1.4.0",
+    "@radix-ui/react-switch": "^1.3.8",
+    "@tailwindcss/cli": "^4.3.3",
     "@types/chrome": "^0.3.4",
     "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "esbuild": "^0.28.2",
     "gifenc": "^1.0.3",
+    "lucide-react": "^1.52.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
   }
 }

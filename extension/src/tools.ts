@@ -1,5 +1,6 @@
 // Every tool an agent can call. Names and arguments match bridge/src/shared/tools.ts.
 
+import { whenTabsEditable } from "./retry.ts";
 import type { ToolResult } from "../../bridge/src/shared/protocol.ts";
 import { textResult } from "../../bridge/src/shared/protocol.ts";
 import * as cdp from "./cdp.ts";
@@ -54,7 +55,7 @@ export class Refused extends Error {}
 /** Mouse and keyboard events only land in the tab in front, so input tools bring theirs forward. */
 export async function foreground(tab: chrome.tabs.Tab): Promise<void> {
   if (!tab.active) {
-    await chrome.tabs.update(tab.id!, { active: true });
+    await whenTabsEditable(() => chrome.tabs.update(tab.id!, { active: true }));
     await sleep(150);
   }
 }
@@ -81,12 +82,12 @@ async function openTab(s: Session, url?: string): Promise<chrome.tabs.Tab> {
     const refused = await checkSite(s.session, s.client, url);
     if (refused) throw new Refused(refused);
   }
-  const tab = await chrome.tabs.create({ url: "about:blank", active: true });
+  const tab = await whenTabsEditable(() => chrome.tabs.create({ url: "about:blank", active: true }));
   await addToGroup(s, tab.id!);
   s.activeTab = tab.id;
   await cdp.attach(tab.id!).catch(() => {});
   if (!url) return tab;
-  await chrome.tabs.update(tab.id!, { url });
+  await whenTabsEditable(() => chrome.tabs.update(tab.id!, { url }));
   return waitForNavigation(tab.id!, "about:blank");
 }
 
@@ -122,7 +123,7 @@ export const HANDLERS: Record<string, Handler> = {
 
   async tab_select(s, a) {
     const tab = await resolveTab(s, Number(a.tabId));
-    await chrome.tabs.update(tab.id!, { active: true });
+    await whenTabsEditable(() => chrome.tabs.update(tab.id!, { active: true }));
     await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
     await cdp.attach(tab.id!).catch(() => {});
     return textResult(`Selected tab ${tab.id}.`);
@@ -130,7 +131,7 @@ export const HANDLERS: Record<string, Handler> = {
 
   async tab_close(s, a) {
     const tab = await resolveTab(s, Number(a.tabId));
-    await chrome.tabs.remove(tab.id!);
+    await whenTabsEditable(() => chrome.tabs.remove(tab.id!));
     if (s.activeTab === tab.id) s.activeTab = undefined;
     return textResult(`Closed tab ${tab.id}.`);
   },
@@ -156,7 +157,7 @@ export const HANDLERS: Record<string, Handler> = {
       const url = normaliseUrl(where);
       const refused = await checkSite(s.session, s.client, url);
       if (refused) throw new Refused(refused);
-      await chrome.tabs.update(tab.id!, { url });
+      await whenTabsEditable(() => chrome.tabs.update(tab.id!, { url }));
     }
     const loaded = await waitForNavigation(tab.id!, where === "reload" ? undefined : tab.url);
     const refused = await checkSite(s.session, s.client, loaded.url);  // a redirect may land elsewhere
@@ -181,7 +182,7 @@ export const HANDLERS: Record<string, Handler> = {
 
   async screenshot(s, a) {
     const tab = await usable(s, a);
-    if (!tab.active) await chrome.tabs.update(tab.id!, { active: true });
+    if (!tab.active) await whenTabsEditable(() => chrome.tabs.update(tab.id!, { active: true }));
     const metrics = await cdp.send(tab.id!, "Page.getLayoutMetrics");
     const vp = metrics.cssVisualViewport ?? metrics.visualViewport;
     const dpr = (await cdp.send(tab.id!, "Runtime.evaluate", { expression: "devicePixelRatio", returnByValue: true })).result.value || 1;
@@ -213,7 +214,7 @@ export const HANDLERS: Record<string, Handler> = {
       return textResult("click needs a ref, or both x and y.", true);
     }
     const what = describe(info) || `the point ${info.x},${info.y}`;
-    const refused = await checkRisky(s.client, tab.url, `click ${what}`);
+    const refused = await checkRisky(s.client, tab, `click ${what}`);
     if (refused) throw new Refused(refused);
     const button = a.button ?? "left";
     const clicks = Math.min(Math.max(Number(a.clickCount) || 1, 1), 3);
@@ -245,7 +246,7 @@ export const HANDLERS: Record<string, Handler> = {
       const sends = focus.inForm || focus.editable;
       if (sends) {
         const what = focus.submitLabel ? `press Enter, which submits "${focus.submitLabel}"` : `press Enter in ${describe(focus)} (this may send it)`;
-        const refused = await checkRisky(s.client, tab.url, focus.submitLabel ? what : `send: ${what}`);
+        const refused = await checkRisky(s.client, tab, focus.submitLabel ? what : `send: ${what}`);
         if (refused) throw new Refused(refused);
       }
     }

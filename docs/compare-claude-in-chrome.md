@@ -37,7 +37,7 @@ says otherwise.
 | Feature | What it does |
 | --- | --- |
 | **Permissions on by default** | Everything allowed; each one can be switched off in Settings |
-| **Ask before risky clicks** | Send, buy, pay, delete, publish, upload… ask first; "Don't allow" is the default button |
+| **Ask before risky clicks** | YOLO mode is on at first (no questions). Switched off: send, buy, pay, delete, publish, upload… ask first, in the pane by the toolbar icon; "Don't allow" is the default button |
 | **Secrets hidden** | Cookie values, auth headers and token-like storage show as "(hidden)" unless allowed |
 | **Optional per-site approval** | Allow once, always allow, or block, per site |
 | **Screenshots become a guide** | `tabbridge/NN-topic/` in the agent's project: numbered images and a README of steps |

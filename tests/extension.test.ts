@@ -36,7 +36,8 @@ test("keys: plain, combined and several presses", () => {
 test("risky labels are caught, ordinary ones are not", async () => {
   // permissions.ts touches chrome.* at load; give it a stub so the pattern can be tested here.
   (globalThis as any).chrome = {
-    windows: { onRemoved: { addListener() {} } },
+    windows: { onFocusChanged: { addListener() {} } },
+    notifications: { onClicked: { addListener() {} } },
     runtime: { onMessage: { addListener() {} } },
   };
   const { RISKY } = await import("../extension/src/permissions.ts");
@@ -57,4 +58,38 @@ test("the manifest is ready for both load-unpacked and the store", () => {
   assert.ok(m.key, "key keeps the unpacked id fixed");
   for (const p of ["debugger", "nativeMessaging", "tabs", "tabGroups", "scripting", "storage"]) assert.ok(m.permissions.includes(p), p);
   for (const size of ["16", "32", "48", "128"]) assert.ok(fs.existsSync(path.join(ROOT, "extension/static", m.icons[size])));
+});
+
+test("activity: each step is summed up in plain words, never showing typed text or values", async () => {
+  const { summarize } = await import("../extension/src/activity.ts");
+  assert.equal(summarize("navigate", { url: "https://example.test/a" }), "Opened https://example.test/a");
+  assert.equal(summarize("navigate", { url: "back" }), "Went back");
+  assert.equal(summarize("click", { ref: "e12" }), "Clicked e12");
+  assert.equal(summarize("type", { text: "hunter2-secret" }), "Typed 14 characters");
+  assert.equal(summarize("form_input", { ref: "e3", value: "4111 1111 1111 1111" }), "Filled e3");
+  assert.equal(summarize("key", { keys: "Control+a Backspace" }), "Pressed Control+a Backspace");
+  assert.equal(summarize("javascript", { code: "document.cookie" }), "Ran a script on the page");
+  assert.equal(summarize("screenshot", {}), "Took a screenshot");
+  assert.equal(summarize("find", { query: "Send" }), "Looked for “Send”");
+  assert.equal(summarize("some_new_tool", { x: 1 }), "some_new_tool");
+  for (const [tool, args] of [["type", { text: "hunter2-secret" }], ["form_input", { ref: "e3", value: "hunter2-secret" }], ["file_upload", { ref: "e1", paths: ["C:/secret.txt"] }]] as const) {
+    assert.ok(!summarize(tool, args as any).includes("hunter2") && !summarize(tool, args as any).includes("secret"), tool);
+  }
+});
+
+test("YOLO mode starts on, and secrets stay hidden (owner's defaults)", async () => {
+  const { DEFAULT_SETTINGS } = await import("../extension/src/settings.ts");
+  assert.equal(DEFAULT_SETTINGS.yolo, true);
+  assert.equal(DEFAULT_SETTINGS.showSecrets, false);
+});
+
+test("tab edits retry while Chrome says tabs can't be edited right now; other errors fail at once", async () => {
+  const { whenTabsEditable } = await import("../extension/src/retry.ts");
+  let n = 0;
+  const busy = () => { n++; if (n < 3) throw new Error("Tabs cannot be edited right now (user may be dragging a tab)."); return "ok"; };
+  assert.equal(await whenTabsEditable(busy, 10, 1), "ok");
+  assert.equal(n, 3);
+  let m = 0;
+  await assert.rejects(whenTabsEditable(() => { m++; throw new Error("No tab with id: 5"); }, 10, 1), /No tab with id/);
+  assert.equal(m, 1);
 });

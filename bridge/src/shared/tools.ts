@@ -143,7 +143,7 @@ export const TOOLS: ToolDef[] = [
     "Everything to start on a broken page, in one call: console errors, failed requests, performance and security. " +
     "Use it first when the user reports a problem with a page.", { tabId }),
   tool("user_captures",
-    "Pages or elements the user sent from Chrome (right-click > Send to my agent), each with a page_report. " +
+    "Pages or elements the user sent from Chrome (right-click > Send to my agent), and notes they typed in the TabBridge side panel; each page comes with a page_report. " +
     "Call it when the user says they sent you something from the browser.", {
     clear: { type: "boolean", description: "Remove them after reading. Default true." },
   }),

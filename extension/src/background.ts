@@ -3,7 +3,8 @@
 
 import { HOST_NAME, PROTOCOL_VERSION, type HostToExtension } from "../../bridge/src/shared/protocol.ts";
 import { setUpMenus } from "./capture.ts";
-import { endSession } from "./permissions.ts";
+import { startStep } from "./activity.ts";
+import { endSession, onApprovalsChanged, pendingCount } from "./permissions.ts";
 import { allSessions, closeSession, getSession, groupTabs, openSession, setConnected } from "./sessions.ts";
 import { browserLabel, type Status } from "./settings.ts";
 import { runTool } from "./tools.ts";
@@ -18,12 +19,16 @@ async function publish(patch: Partial<Status> = {}): Promise<void> {
   })));
   status = { ...status, ...patch, sessions };
   await chrome.storage.session.set({ status });
-  // ✓ while connected, ! when not; the tooltip says how many agents are working.
-  await chrome.action.setBadgeText({ text: status.connected ? "✓" : "!" });
-  await chrome.action.setBadgeBackgroundColor({ color: status.connected ? "#2f6f4e" : "#b3261e" });
+  // The number of questions waiting for an answer, in orange; else ✓ while connected, ! when not.
+  // The tooltip says the same in words.
+  const asking = pendingCount();
+  await chrome.action.setBadgeText({ text: asking ? String(asking) : status.connected ? "✓" : "!" });
+  await chrome.action.setBadgeBackgroundColor({ color: asking ? "#c2410c" : status.connected ? "#2f6f4e" : "#b3261e" });
   await chrome.action.setBadgeTextColor?.({ color: "#ffffff" });
   const agents = sessions.length === 1 ? "1 agent working" : `${sessions.length} agents working`;
-  await chrome.action.setTitle({ title: status.connected ? `TabBridge: connected · ${agents}` : `TabBridge: not connected · ${status.error ?? "open the popup"}` });
+  await chrome.action.setTitle({ title: asking
+    ? `TabBridge: ${asking === 1 ? "a question waits" : `${asking} questions wait`} for your answer · click to see`
+    : status.connected ? `TabBridge: connected · ${agents}` : `TabBridge: not connected · ${status.error ?? "open the popup"}` });
   await setConnected(status.connected);
 }
 
@@ -66,8 +71,14 @@ async function onMessage(message: HostToExtension): Promise<void> {
     endSession(message.session);
     publish();
   } else if (message.type === "call") {
-    const result = await runTool(getSession(message.session), message.tool, message.args);
+    const session = getSession(message.session);
+    // The side panel's live console shows each step as it runs.
+    const finish = await startStep(session.client, message.tool, message.args ?? {}).catch(() => null);
+    const result = await runTool(session, message.tool, message.args);
     port?.postMessage({ type: "result", id: message.id, result });
+    const first = result.content.find((c) => c.type === "text");
+    const error = result.isError && first?.type === "text" ? first.text : undefined;
+    await finish?.(!!result.isError, error).catch(() => {});
     publish();
   }
 }
@@ -81,6 +92,7 @@ chrome.alarms.onAlarm.addListener(connect);
 chrome.runtime.onMessage.addListener((message, _sender, reply) => {
   if (message?.type === "reconnect") { retryMs = 1000; connect(); reply(true); }
 });
+onApprovalsChanged(() => void publish());
 connect();
 
 // Renaming this browser in Settings updates what agents see in the browsers tool.

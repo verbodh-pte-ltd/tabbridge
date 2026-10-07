@@ -47,14 +47,14 @@ try {
   let approval;
   for (let i = 0; i < 50 && !approval; i++) {
     const { targetInfos } = await chrome.cdp("Target.getTargets");
-    approval = targetInfos.find((t) => t.url.includes("/approve.html"));
+    approval = targetInfos.find((t) => t.url.includes("/popup.html"));
     if (!approval) await sleep(100);
   }
   // Extension pages can't be framed into a web page, so photograph the real window and lay the
   // picture over the page it belongs to.
   const { sessionId: pop } = await chrome.cdp("Target.attachToTarget", { targetId: approval.targetId, flatten: true });
   for (let i = 0; i < 50; i++) {
-    const { result } = await chrome.cdp("Runtime.evaluate", { expression: "document.querySelectorAll('#buttons button').length", returnByValue: true }, pop);
+    const { result } = await chrome.cdp("Runtime.evaluate", { expression: "document.querySelectorAll('[data-approval] button').length", returnByValue: true }, pop);
     if (result.value > 0) break;
     await sleep(100);
   }

@@ -8,6 +8,30 @@ import { getSettings } from "./settings.ts";
 
 const KEEP = 20;
 
+async function saveCapture(capture: Capture): Promise<void> {
+  const { captures = [] } = await chrome.storage.session.get("captures") as { captures?: Capture[] };
+  await chrome.storage.session.set({ captures: [...captures, capture].slice(-KEEP) });
+}
+
+// The side panel's "Send to my agent" box: a note, with the current page if the user asks.
+chrome.runtime.onMessage.addListener((message, _sender, reply) => {
+  if (message?.type !== "send_note") return;
+  (async () => {
+    const note = String(message.note ?? "").trim().slice(0, 4000);
+    let tab: chrome.tabs.Tab | undefined;
+    if (message.attachPage) [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const page = tab?.id && /^https?:|^file:/.test(tab.url ?? "");
+    await saveCapture({
+      time: Date.now(),
+      note: note || undefined,
+      what: page ? (note ? "a note and the page" : "the page") : "a note",
+      ...(page ? { tabId: tab!.id, url: tab!.url, report: await report(tab!), shared: await shareTab(tab!.id!).catch(() => false) } : { shared: false }),
+    });
+    return { ok: true, attached: !!page };
+  })().then(reply, (err) => reply({ ok: false, error: err?.message ?? String(err) }));
+  return true;
+});
+
 export function setUpMenus(): void {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({ id: "tb-element", title: "Send this element to my agent (TabBridge)", contexts: ["all"] });
@@ -31,8 +55,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       report: await report(tab),
       shared,
     };
-    const { captures = [] } = await chrome.storage.session.get("captures") as { captures?: Capture[] };
-    await chrome.storage.session.set({ captures: [...captures, capture].slice(-KEEP) });
+    await saveCapture(capture);
     if ((await getSettings()).notify) {
       chrome.notifications.create({
         type: "basic",

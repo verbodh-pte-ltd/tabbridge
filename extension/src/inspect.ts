@@ -290,13 +290,14 @@ export const INSPECT_HANDLERS: Record<string, Handler> = {
     const { captures = [] } = await chrome.storage.session.get("captures") as { captures?: Capture[] };
     if (a.clear !== false) await chrome.storage.session.set({ captures: [] });
     if (!captures.length) {
-      return textResult("Nothing sent yet. The user can right-click a page or an element and choose \"Send to my agent (TabBridge)\".");
+      return textResult("Nothing sent yet. The user can right-click a page or an element and choose \"Send to my agent (TabBridge)\", or write a note in the TabBridge side panel.");
     }
-    return textResult(captures.map((c, i) => untrusted(c.url, [
-      `Capture ${i + 1}, ${new Date(c.time).toLocaleString()}: ${c.what} in tab ${c.tabId}${c.shared ? " (now in the TabBridge group, so you can use it)" : ""}`,
-      c.element ? `Element: ${c.element}` : "",
-      c.report,
-    ].filter(Boolean).join("\n"))).join("\n\n"));
+    // A note is the user's own words, so it sits outside the untrusted page-content wrapper.
+    return textResult(captures.map((c, i) => [
+      `Capture ${i + 1}, ${new Date(c.time).toLocaleString()}: ${c.what}${c.url ? ` in tab ${c.tabId}` : ""}${c.shared ? " (now in the TabBridge group, so you can use it)" : ""}`,
+      c.note ? `Note from the user (typed in the TabBridge side panel): ${c.note}` : "",
+      c.url ? untrusted(c.url, [c.element ? `Element: ${c.element}` : "", c.report ?? ""].filter(Boolean).join("\n")) : "",
+    ].filter(Boolean).join("\n")).join("\n\n"));
   },
 };
 
@@ -322,11 +323,14 @@ export async function report(tab: chrome.tabs.Tab): Promise<string> {
 
 export interface Capture {
   time: number;
-  tabId: number;
-  url: string;
+  /** A note the user typed in the side panel: the user's own words, not page content. */
+  note?: string;
+  /** The page sent with it, if any: from the right-click menu, or "Attach this page". */
+  tabId?: number;
+  url?: string;
   what: string;
   element?: string;
-  report: string;
+  report?: string;
   shared: boolean;
 }
 

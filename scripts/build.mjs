@@ -1,5 +1,6 @@
 // Builds the bridge (bridge/dist) and the extension (extension/dist).
 import { build } from "esbuild";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -27,10 +28,13 @@ await build({ ...node, entryPoints: [r("bridge/src/cli.ts")], outfile: r("bridge
 await build({ ...node, entryPoints: [r("bridge/src/host-entry.ts")], outfile: r("bridge/dist/host.js") });
 
 const web = { bundle: true, format: "esm", target: "chrome116", logLevel: "warning" };
-await build({ ...web, entryPoints: ["background", "popup", "options", "approve"].map((n) => r(`extension/src/${n}.ts`)),
-  outdir: r("extension/dist") });
+await build({ ...web, entryPoints: ["background.ts", "popup.tsx", "sidepanel.tsx", "options.ts"].map((n) => r(`extension/src/${n}`)),
+  outdir: r("extension/dist"), splitting: true, chunkNames: "chunks/[name]-[hash]", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' }, minify: true });
 await build({ ...web, format: "iife", entryPoints: [r("extension/src/page-agent.ts")], outfile: r("extension/dist/page-agent.js") });
 fs.cpSync(r("extension/static"), r("extension/dist"), { recursive: true });
+// The pane and the approval window use shadcn/ui components, styled with Tailwind.
+execFileSync(process.execPath, [r("node_modules/@tailwindcss/cli/dist/index.mjs"), "-i", r("extension/src/ui/theme.css"),
+  "-o", r("extension/dist/ui.css"), "--minify"], { stdio: ["ignore", "ignore", "inherit"] });
 
 for (const f of ["README.md", "LICENSE"]) if (fs.existsSync(r(f))) fs.copyFileSync(r(f), r("bridge", f));
 console.log(`built ${version}: bridge/dist, extension/dist`);

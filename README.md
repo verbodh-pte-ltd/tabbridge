@@ -2,8 +2,9 @@
 
 **Let any AI agent use your own Chrome.** Claude Code, Codex, Gemini CLI, Cursor, or any app that
 speaks [MCP](https://modelcontextprotocol.io), can open pages, read them, click, type, take
-screenshots and see what DevTools sees, in your normal browser with your sign-ins, and with your
-approval for anything risky.
+screenshots and see what DevTools sees, in your normal browser with your sign-ins. YOLO mode is
+on at first, so agents aren't stopped by questions; switch it off in the TabBridge pane to be asked
+before anything risky (send, buy, delete, publish…).
 
 ![An agent fills in and sends a form through TabBridge; the risky click is approved first](docs/demo.gif)
 
@@ -72,7 +73,7 @@ Once published, the same steps become `npx tabbridge install`, the Chrome Web St
 | `storage` | DevTools Application: local and session storage, cookies, IndexedDB, cache, service workers, manifest |
 | `performance`, `security` | Load timings and Web Vitals; HTTPS, certificate, security headers |
 | `page_report` | All of the above for a broken page, in one call |
-| `user_captures` | Pages or elements you sent with right-click › **Send to my agent (TabBridge)** |
+| `user_captures` | Pages or elements you sent with right-click › **Send to my agent (TabBridge)**, and notes you typed in the side panel |
 
 Apps and scripts that don't speak MCP can run one tool at a time:
 
@@ -108,6 +109,16 @@ the same guide.
 Each Chrome (or profile) running TabBridge gets its own slot. Name each one in TabBridge's settings
 ("Work", "Testing"…). Agents use the `browsers` tool to list and pick; scripts set
 `TABBRIDGE_BROWSER=<name>`. With one Chrome, nothing to do.
+
+## The pane and the live console
+
+- **The pane** (click the TabBridge icon) shows who is connected, the YOLO switch, and any
+  question waiting for you. When YOLO mode is off, a question opens the pane by itself, next to the
+  icon; the badge counts waiting questions. Closing the pane doesn't answer: the question waits.
+- **The live console** (Chrome's side panel, "Open the live console" in the pane) shows each step
+  your agent takes in this browser as it happens, asks its questions there while it's open, and has
+  a box to send a note to your agent; **+** sends the current page too. The agent reads it with
+  `user_captures`. TabBridge has no AI model of its own, so the console doesn't chat.
 
 ## Safety
 

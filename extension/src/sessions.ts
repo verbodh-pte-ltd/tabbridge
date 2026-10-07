@@ -3,6 +3,7 @@
 // its own group). Either way an agent may only use the tabs it opened, plus any tab the user
 // drags into the group; it can't use another agent's tabs.
 
+import { whenTabsEditable } from "./retry.ts";
 import { getSettings } from "./settings.ts";
 
 export interface Session {
@@ -32,7 +33,7 @@ export async function setConnected(on: boolean): Promise<void> {
   for (const g of await chrome.tabGroups.query({})) {
     const base = (g.title ?? "").replace(/ ✓$/, "");
     if (base === "TabBridge" || base.startsWith("TabBridge · ")) {
-      await chrome.tabGroups.update(g.id, { title: groupTitle(base) }).catch(() => {});
+      await whenTabsEditable(() => chrome.tabGroups.update(g.id, { title: groupTitle(base) })).catch(() => {});
     }
   }
 }
@@ -95,17 +96,17 @@ export async function addToGroup(s: Session, tabId: number): Promise<void> {
   const shared = (await getSettings()).sharedGroup;
   const existing = await groupFor(s);
   if (existing !== undefined) {
-    await chrome.tabs.group({ groupId: existing, tabIds: [tabId] });
+    await whenTabsEditable(() => chrome.tabs.group({ groupId: existing, tabIds: [tabId] }));
     return;
   }
-  const id = await chrome.tabs.group({ tabIds: [tabId] });
+  const id = await whenTabsEditable(() => chrome.tabs.group({ tabIds: [tabId] }));
   if (shared) {
     sharedGroupId = id;
-    await chrome.tabGroups.update(id, { title: groupTitle("TabBridge"), color: BRAND_COLOR, collapsed: false });
+    await whenTabsEditable(() => chrome.tabGroups.update(id, { title: groupTitle("TabBridge"), color: BRAND_COLOR, collapsed: false }));
   } else {
     s.groupId = id;
     const color = COLORS[allSessions().indexOf(s) % COLORS.length] ?? "blue";
-    await chrome.tabGroups.update(id, { title: groupTitle(`TabBridge · ${s.client}`), color, collapsed: false });
+    await whenTabsEditable(() => chrome.tabGroups.update(id, { title: groupTitle(`TabBridge · ${s.client}`), color, collapsed: false }));
   }
 }
 
@@ -135,10 +136,11 @@ export async function shareTab(tabId: number): Promise<boolean> {
   for (const s of allSessions()) s.tabs.delete(tabId);
   sharedGroupId = await liveGroup(sharedGroupId);
   if (sharedGroupId !== undefined) {
-    await chrome.tabs.group({ groupId: sharedGroupId, tabIds: [tabId] });
+    await whenTabsEditable(() => chrome.tabs.group({ groupId: sharedGroupId, tabIds: [tabId] }));
   } else {
-    sharedGroupId = await chrome.tabs.group({ tabIds: [tabId] });
-    await chrome.tabGroups.update(sharedGroupId, { title: groupTitle("TabBridge"), color: BRAND_COLOR, collapsed: false });
+    const created = await whenTabsEditable(() => chrome.tabs.group({ tabIds: [tabId] }));
+    sharedGroupId = created;
+    await whenTabsEditable(() => chrome.tabGroups.update(created, { title: groupTitle("TabBridge"), color: BRAND_COLOR, collapsed: false }));
   }
   return true;
 }
