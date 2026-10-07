@@ -93,3 +93,33 @@ test("tab edits retry while Chrome says tabs can't be edited right now; other er
   await assert.rejects(whenTabsEditable(() => { m++; throw new Error("No tab with id: 5"); }, 10, 1), /No tab with id/);
   assert.equal(m, 1);
 });
+
+test("a native port that closes at once is not written to (host not installed)", async () => {
+  // Chrome closes the port right away when the host isn't registered; posting on it then throws
+  // "Attempting to use a disconnected port object".
+  let disconnected = false;
+  let postedAfterClose = 0;
+  const onDisconnect: (() => void)[] = [];
+  const port = {
+    onMessage: { addListener() {} },
+    onDisconnect: { addListener: (f: () => void) => onDisconnect.push(f) },
+    postMessage() { if (disconnected) postedAfterClose++; },
+  };
+  const connectNative = () => {
+    // Only the first connect fails; the worker's retry then finds the port open.
+    if (!disconnected) queueMicrotask(() => { disconnected = true; onDisconnect.splice(0).forEach((f) => f()); });
+    return port;
+  };
+  const any = (): any => new Proxy(() => {}, {
+    get: (_t, key) => key === "then" ? undefined : key === "connectNative" ? connectNative : key === "getManifest" ? () => ({ version: "0" })
+      : key === "lastError" ? { message: "Specified native messaging host not found." } : any(),
+    apply: () => Promise.resolve([]),
+  });
+  (globalThis as any).chrome = any();
+  // Bundled like the real build: the worker pulls in gifenc, which Node can't import by name.
+  const { build } = await import("esbuild");
+  const out = await build({ entryPoints: [path.join(ROOT, "extension/src/background.ts")], bundle: true, format: "esm", write: false, logLevel: "silent" });
+  await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString("base64")}`);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(postedAfterClose, 0);
+});

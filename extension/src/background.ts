@@ -48,7 +48,8 @@ function connect(): void {
     scheduleRetry(why);
   });
   const ready = port;
-  browserLabel().then((label) => ready.postMessage({ type: "ready", version: chrome.runtime.getManifest().version, protocol: PROTOCOL_VERSION, label }));
+  // The port may close before the label is ready, as it does at once when the host isn't installed.
+  browserLabel().then((label) => port === ready && ready.postMessage({ type: "ready", version: chrome.runtime.getManifest().version, protocol: PROTOCOL_VERSION, label }));
   retryMs = 1000;
   publish({ connected: true, error: undefined });
 }
@@ -97,5 +98,7 @@ connect();
 
 // Renaming this browser in Settings updates what agents see in the browsers tool.
 chrome.storage.onChanged.addListener(async (changes, area) => {
-  if (area === "local" && changes.settings && port) port.postMessage({ type: "label", label: await browserLabel() });
+  if (area !== "local" || !changes.settings) return;
+  const label = await browserLabel();
+  port?.postMessage({ type: "label", label });
 });
