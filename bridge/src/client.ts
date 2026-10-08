@@ -8,7 +8,7 @@ import { PROTOCOL_VERSION, textResult, type ToolResult } from "./shared/protocol
 
 export const NOT_CONNECTED =
   "TabBridge can't reach Chrome. Open Chrome with the TabBridge extension turned on, then try again. " +
-  "To check the setup, run: npx tabbridge doctor";
+  "To check the setup, run: npx @verbodhpteltd/tabbridge doctor";
 
 export class BridgeClient {
   private socket: net.Socket | null = null;

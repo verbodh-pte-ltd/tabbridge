@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TabBridge",
   "short_name": "TabBridge",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Lets AI agents on your computer (Claude Code, Codex, Gemini CLI and others) use this browser, with your approval.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9PmxGrlQ0Gaitp8hKsCQYSUIl1yhWraJqUKaBP9UAgQfaYk4CKwOvucmWZ6HY0SiU3yoq84mBmPqyH03vDD7tDk/Q7BmfTPqC8MfKupodADh6pJoTKs9eep4I7qnssiHXHKn6Gns44dWDkEVLuQxhr6jgfdWPjWZ3XM3v4Zl24X/wbSBhwCfDOss7s+cxDmKZWWetT9gJjsI00utgozNxo5lkIkMJeR3gWplL4Ql3AKFq3uNnwZgOe6PzFOJXRZKRGt9M3WhZjnqV/OE62oVC4HUU/AMRRNmIkFzDpwXkySRUc7T+8hMfGu8/kjdQCpPdI4BVHxrWJw8hV3Zni5sDwIDAQAB",
   "minimum_chrome_version": "116",

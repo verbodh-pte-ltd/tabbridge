@@ -18,10 +18,10 @@ Call `tabs_list`. Three outcomes:
   open Chrome and check the TabBridge icon has no red "!". Don't retry in a loop.
 - **The tools don't exist at all:** TabBridge isn't set up. Give the person these steps and stop:
   1. Add the TabBridge extension to Chrome (Chrome Web Store, or load unpacked from the repo).
-  2. Run once: `npx tabbridge install`
-  3. Connect this agent, for example `claude mcp add tabbridge -- npx -y tabbridge mcp`
-     (other agents: `npx tabbridge config codex|gemini|cursor`), then restart the agent.
-  4. Check: `npx tabbridge doctor` shows ✓ on every line.
+  2. Run once: `npx @verbodhpteltd/tabbridge install`
+  3. Connect this agent, for example `claude mcp add tabbridge -- npx -y @verbodhpteltd/tabbridge mcp`
+     (other agents: `npx @verbodhpteltd/tabbridge config codex|gemini|cursor`), then restart the agent.
+  4. Check: `npx @verbodhpteltd/tabbridge doctor` shows ✓ on every line.
 
 If more than one Chrome runs TabBridge, `browsers` lists them by name; pick with `browsers` `select`.
 
