@@ -24,21 +24,19 @@ How it compares with Claude in Chrome, tool by tool: [docs/compare-claude-in-chr
 
 You need Chrome (or Edge or Brave) and Node.js 20 or newer.
 
-Until TabBridge is on npm and the Chrome Web Store, install it from the
-[latest GitHub release](https://github.com/verbodh-pte-ltd/tabbridge/releases/latest):
-
 1. **The bridge, once per computer:**
 
    ```
-   npm install -g https://github.com/verbodh-pte-ltd/tabbridge/releases/download/v0.2.0/tabbridge-0.2.0.tgz
+   npm install -g @verbodhpteltd/tabbridge
    tabbridge install
    ```
 
    `tabbridge install` registers the small host program Chrome talks to. Nothing runs until the
-   extension starts it.
-2. **The extension:** download `tabbridge-extension-0.2.0.zip` from the release and unzip it.
-   Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the
-   unzipped folder.
+   extension starts it. Without a global install, `npx @verbodhpteltd/tabbridge install` does the same.
+2. **The extension:** until it is on the Chrome Web Store, download `tabbridge-extension-<version>.zip`
+   from the [latest GitHub release](https://github.com/verbodh-pte-ltd/tabbridge/releases/latest) and
+   unzip it. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose
+   the unzipped folder.
 3. **Connect your agent:**
 
    ```
@@ -47,9 +45,6 @@ Until TabBridge is on npm and the Chrome Web Store, install it from the
    ```
 
 4. **Check it:** `tabbridge doctor` prints a ✓ or ✗ for every part, and what to do about each ✗.
-
-Once published, the same steps become `npx tabbridge install`, the Chrome Web Store, and
-`claude mcp add tabbridge -- npx -y tabbridge mcp`.
 
 ## What an agent can do
 
@@ -78,8 +73,8 @@ Once published, the same steps become `npx tabbridge install`, the Chrome Web St
 Apps and scripts that don't speak MCP can run one tool at a time:
 
 ```
-npx tabbridge call navigate '{"url":"https://example.com"}'
-npx tabbridge call page_report
+npx @verbodhpteltd/tabbridge call navigate '{"url":"https://example.com"}'
+npx @verbodhpteltd/tabbridge call page_report
 ```
 
 ## Teach your agent to use it

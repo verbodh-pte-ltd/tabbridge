@@ -6,16 +6,16 @@ import { TOOLS } from "./shared/tools.ts";
 import { VERSION } from "./version.ts";
 
 const CONFIGS: Record<string, string> = {
-  claude: "claude mcp add tabbridge -- npx -y tabbridge mcp",
+  claude: "claude mcp add tabbridge -- npx -y @verbodhpteltd/tabbridge mcp",
   codex: `# ~/.codex/config.toml
 [mcp_servers.tabbridge]
 command = "npx"
-args = ["-y", "tabbridge", "mcp"]`,
+args = ["-y", "@verbodhpteltd/tabbridge", "mcp"]`,
   gemini: `// ~/.gemini/settings.json
-{ "mcpServers": { "tabbridge": { "command": "npx", "args": ["-y", "tabbridge", "mcp"] } } }`,
+{ "mcpServers": { "tabbridge": { "command": "npx", "args": ["-y", "@verbodhpteltd/tabbridge", "mcp"] } } }`,
   cursor: `// ~/.cursor/mcp.json
-{ "mcpServers": { "tabbridge": { "command": "npx", "args": ["-y", "tabbridge", "mcp"] } } }`,
-  json: `{ "mcpServers": { "tabbridge": { "command": "npx", "args": ["-y", "tabbridge", "mcp"] } } }`,
+{ "mcpServers": { "tabbridge": { "command": "npx", "args": ["-y", "@verbodhpteltd/tabbridge", "mcp"] } } }`,
+  json: `{ "mcpServers": { "tabbridge": { "command": "npx", "args": ["-y", "@verbodhpteltd/tabbridge", "mcp"] } } }`,
 };
 
 const HELP = `TabBridge ${VERSION}: lets any AI agent use your Chrome.

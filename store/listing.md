@@ -36,8 +36,8 @@ You stay in charge
 
 Setup
 1. Add TabBridge to Chrome.
-2. Run once in a terminal: npx tabbridge install
-3. Connect your agent, for example: claude mcp add tabbridge -- npx -y tabbridge mcp
+2. Run once in a terminal: npx @verbodhpteltd/tabbridge install
+3. Connect your agent, for example: claude mcp add tabbridge -- npx -y @verbodhpteltd/tabbridge mcp
 
 Open source (Apache 2.0): https://github.com/verbodh-pte-ltd/tabbridge
 
@@ -59,7 +59,7 @@ Lets AI agents that the user runs on their own computer control and read the use
 | Permission | Justification |
 | --- | --- |
 | debugger | Sends clicks, key presses and typing to tabs the agent uses, takes screenshots, and reads console, network, storage, performance and security details (the same data as DevTools), only in tabs in the agent's TabBridge group or tabs the user sends to it. |
-| nativeMessaging | Connects to the TabBridge program the user installs on their computer (npx tabbridge install), which is how the user's local AI agent reaches the extension. |
+| nativeMessaging | Connects to the TabBridge program the user installs on their computer (npx @verbodhpteltd/tabbridge install), which is how the user's local AI agent reaches the extension. |
 | tabs | Opens, lists, selects and closes the agent's tabs, and reads their URL and title so the agent knows where it is. |
 | tabGroups | Keeps every tab an agent uses in one "TabBridge" group, so the user can see which tabs agents control and agents can't use other tabs. |
 | scripting | Reads the page's elements and text, and fills in form fields, on the page the agent is working on. |

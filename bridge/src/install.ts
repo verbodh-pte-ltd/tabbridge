@@ -78,8 +78,8 @@ export function install(extraIds: string[] = []): void {
   console.log(`  trusts extension ids: ${ids.join(", ")}`);
   console.log("\nNext:");
   console.log("  1. Add the TabBridge extension to Chrome (see the README).");
-  console.log("  2. Connect an agent, for example:  claude mcp add tabbridge -- npx -y tabbridge mcp");
-  console.log("  3. Check everything:               npx tabbridge doctor");
+  console.log("  2. Connect an agent, for example:  claude mcp add tabbridge -- npx -y @verbodhpteltd/tabbridge mcp");
+  console.log("  3. Check everything:               npx @verbodhpteltd/tabbridge doctor");
 }
 
 export function uninstall(): void {
@@ -101,24 +101,24 @@ export async function doctor(): Promise<boolean> {
   const checks: [string, boolean, string][] = [];
   const add = (name: string, ok: boolean, fix: string) => checks.push([name, ok, fix]);
 
-  add("host program copied", fs.existsSync(hostScript()), "run: npx tabbridge install");
-  add("host launcher written", fs.existsSync(launcher()), "run: npx tabbridge install");
+  add("host program copied", fs.existsSync(hostScript()), "run: npx @verbodhpteltd/tabbridge install");
+  add("host launcher written", fs.existsSync(launcher()), "run: npx @verbodhpteltd/tabbridge install");
 
   let manifestOk = false;
   try {
     const m = JSON.parse(fs.readFileSync(manifestPath(), "utf8"));
     manifestOk = m.name === HOST_NAME && fs.existsSync(m.path);
   } catch { /* missing or broken */ }
-  add("host manifest valid", manifestOk, "run: npx tabbridge install");
+  add("host manifest valid", manifestOk, "run: npx @verbodhpteltd/tabbridge install");
 
   if (process.platform === "win32") {
     let value = "";
     try { value = execFileSync("reg", ["query", WIN_KEYS[0], "/ve"], { encoding: "utf8" }); } catch { /* missing */ }
-    add("registered with Chrome", value.includes(manifestPath()), "run: npx tabbridge install");
+    add("registered with Chrome", value.includes(manifestPath()), "run: npx @verbodhpteltd/tabbridge install");
   } else {
     const chrome = unixBrowserDirs()[0].dir;
     add("registered with Chrome", fs.existsSync(path.join(chrome, "NativeMessagingHosts", `${HOST_NAME}.json`)),
-      "run: npx tabbridge install");
+      "run: npx @verbodhpteltd/tabbridge install");
   }
 
   const nodeOk = (() => {
@@ -128,7 +128,7 @@ export async function doctor(): Promise<boolean> {
       return !!node && fs.existsSync(node);
     } catch { return false; }
   })();
-  add("Node.js still at the installed path", nodeOk, "Node moved or was upgraded: run npx tabbridge install again");
+  add("Node.js still at the installed path", nodeOk, "Node moved or was upgraded: run npx @verbodhpteltd/tabbridge install again");
 
   const running = await new Promise<boolean>((resolve) => {
     const s = net.connect(pipePath());

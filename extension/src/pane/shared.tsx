@@ -100,7 +100,7 @@ export function NotConnected({ status }: { status: Status | null }) {
     <section className="grid gap-1 border-b px-4 py-3 text-destructive">
       <p className="m-0 flex items-center gap-2 font-medium"><CircleX className="size-4" /> Can't reach the TabBridge helper</p>
       <p className="m-0 text-muted-foreground">
-        {status.error ?? "It isn't running on this computer."} Run <code className="font-mono text-xs">npx tabbridge install</code>, then Reconnect.
+        {status.error ?? "It isn't running on this computer."} Run <code className="font-mono text-xs">npx @verbodhpteltd/tabbridge install</code>, then Reconnect.
       </p>
     </section>
   );

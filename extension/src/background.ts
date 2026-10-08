@@ -56,7 +56,7 @@ function connect(): void {
 
 function scheduleRetry(why?: string): void {
   const error = why && /not found|not registered|Specified native messaging host/i.test(why)
-    ? "The TabBridge host isn't installed. Run: npx tabbridge install"
+    ? "The TabBridge host isn't installed. Run: npx @verbodhpteltd/tabbridge install"
     : why;
   publish({ connected: false, error });
   setTimeout(connect, retryMs);

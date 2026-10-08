@@ -69,7 +69,7 @@ function Empty({ status }: { status: Status | null }) {
       <img src="icons/icon128.png" alt="" className="size-16 opacity-20 grayscale" />
       <p className="m-0 max-w-60 text-muted-foreground">
         {status && !status.connected
-          ? "TabBridge can't reach its helper. Run npx tabbridge install, then Reconnect."
+          ? "TabBridge can't reach its helper. Run npx @verbodhpteltd/tabbridge install, then Reconnect."
           : "When an agent uses this browser, each step shows here as it happens."}
       </p>
     </div>
