@@ -33,10 +33,11 @@ You need Chrome (or Edge or Brave) and Node.js 20 or newer.
 
    `tabbridge install` registers the small host program Chrome talks to. Nothing runs until the
    extension starts it. Without a global install, `npx @verbodhpteltd/tabbridge install` does the same.
-2. **The extension:** until it is on the Chrome Web Store, download `tabbridge-extension-<version>.zip`
-   from the [latest GitHub release](https://github.com/verbodh-pte-ltd/tabbridge/releases/latest) and
-   unzip it. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose
-   the unzipped folder.
+2. **The extension:** add it from the
+   [Chrome Web Store](https://chromewebstore.google.com/detail/tabbridge/pomolcbmcembghhjgnjllblncbpmihcd).
+   A copy loaded with **Load unpacked** (from `tabbridge-extension-<version>.zip` on the
+   [latest GitHub release](https://github.com/verbodh-pte-ltd/tabbridge/releases/latest)) also works, but
+   Chrome switches it off unless **Developer mode** stays on, because the store has not reviewed it.
 3. **Connect your agent:**
 
    ```
