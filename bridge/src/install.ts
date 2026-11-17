@@ -7,8 +7,10 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { homeDir, pipePath, tokenPath } from "./paths.ts";
+import { homeDir, liveBrowsers, pipePath, tokenPath } from "./paths.ts";
 import { DEV_EXTENSION_ID, HOST_NAME, STORE_EXTENSION_IDS } from "./shared/protocol.ts";
+import { VERSION } from "./version.ts";
+import { versionReport } from "./versions.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const WIN_KEYS = [
@@ -139,5 +141,7 @@ export async function doctor(): Promise<boolean> {
     "open Chrome and check the TabBridge extension is turned on (chrome://extensions)");
 
   for (const [name, ok, fix] of checks) console.log(`${ok ? "✓" : "✗"} ${name}${ok ? "" : `  →  ${fix}`}`);
+  // Information only: a difference does not change the exit code.
+  console.log(versionReport({ bridge: VERSION, home: homeDir(), browsers: await liveBrowsers() }).lines.join("\n"));
   return checks.every(([, ok]) => ok);
 }

@@ -27,7 +27,7 @@ export const tokenPath = (slot = 1) => path.join(homeDir(), slot === 1 ? "token"
 export const logPath = () => path.join(homeDir(), "host.log");
 const registryPath = () => path.join(homeDir(), "browsers.json");
 
-export interface BrowserEntry { slot: number; label: string; pid: number; started: string }
+export interface BrowserEntry { slot: number; label: string; pid: number; started: string; host?: string; extension?: string }
 
 export function readBrowsers(): BrowserEntry[] {
   try {
