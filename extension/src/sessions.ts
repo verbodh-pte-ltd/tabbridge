@@ -92,7 +92,16 @@ export async function groupTabs(s: Session): Promise<chrome.tabs.Tab[]> {
   return tabs;
 }
 
-export async function addToGroup(s: Session, tabId: number): Promise<void> {
+// Two agents opening their first tab together would each create the shared group, and one group would be lost.
+let grouping: Promise<unknown> = Promise.resolve();
+
+export function addToGroup(s: Session, tabId: number): Promise<void> {
+  const run = grouping.then(() => addToGroupNow(s, tabId));
+  grouping = run.catch(() => {});
+  return run;
+}
+
+async function addToGroupNow(s: Session, tabId: number): Promise<void> {
   s.tabs.add(tabId);
   const settings = await getSettings();
   const shared = settings.sharedGroup;

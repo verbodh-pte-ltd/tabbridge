@@ -49,7 +49,8 @@ export const touch = (tabId: number) => safely(tabId, "touch", [], true);
 export const point = (tabId: number, x: number, y: number, kind: "click" | "hover" | "drag" | "scroll") => safely(tabId, "point", [x, y, kind], true);
 
 /** Hides the overlay until released. Holds nest, so two captures at once never show it. */
-export const hold = (tabId: number) => safely(tabId, "suspend");
+// install: the page script may not be there yet (a fresh page, with the touch still on its way): hide it from the first moment.
+export const hold = (tabId: number) => safely(tabId, "suspend", [], true);
 export const release = (tabId: number) => safely(tabId, "resume");
 
 /** Runs a capture with the overlay hidden, so the agent's screenshot shows the page alone. */

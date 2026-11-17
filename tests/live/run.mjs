@@ -615,6 +615,7 @@ try {
       const c = new BridgeClient("agent-c");
       const r = await c.call("tab_create", { url: site.url("/second") });
       const id = Number(text(r).match(/tab (\d+)/)?.[1]);
+      expect(!r.isError && id > 0, "tab_create answered: " + text(r));
       const where = JSON.parse(await chrome.extEval(`Promise.all([chrome.tabs.get(${id}), chrome.storage.session.get("agentWindow")]).then(([t, s]) => JSON.stringify({ win: t.windowId, agent: s.agentWindow ?? null }))`));
       expect(where.agent === null || where.win !== where.agent, "the tab went to the agent window: " + JSON.stringify(where));
       await c.call("tab_close", { tabId: id });
@@ -658,6 +659,21 @@ try {
     const s = await winState();
     const live = await chrome.extEval(`chrome.windows.get(${s.saved}).then((w) => w.id)`);
     expect(live === s.saved, "saved id " + s.saved + " is not a live window");
+  });
+
+  await check("agent window: two agents starting at once each get their own tab", async () => {
+    const before = await winState();
+    await chrome.extEval(`chrome.windows.remove(${before.saved})`);
+    await sleep(500);
+    const [ra, rb] = await Promise.all([a.call("navigate", { url: site.url("/second") }), b.call("navigate", { url: site.url("/tools") })]);
+    expect(!ra.isError && !rb.isError, text(ra) + "\n" + text(rb));
+    const titleA = await js(a, "document.title"), titleB = await js(b, "document.title");
+    expect(titleA.includes("Second page") && titleB.includes("Acme widgets"), "titles: " + titleA + " | " + titleB);
+    const listA = await tabIds(a), listB = await tabIds(b);
+    expect(listA.length === 1 && listB.length === 1 && listA[0] !== listB[0], "tabs: " + listA + " | " + listB);
+    const one = await Promise.all([b.call("tab_create", { url: site.url("/second") }), b.call("tab_create", { url: site.url("/second") })]);
+    expect(one.every((r) => !r.isError) && new Set(one.map((r) => text(r).match(/tab (\d+)/)?.[1])).size === 2, one.map(text).join(" | "));
+    for (const id of (await tabIds(b)).slice(1)) await b.call("tab_close", { tabId: id });
   });
 
   const edgeTab = async () => {
@@ -812,6 +828,16 @@ try {
     await b.call("hover", { tabId: ovTab, ...hov });
     await sleep(300);
     expect((await overlayOf(ovTab)).visible, "the overlay did not come back after the recording");
+  });
+
+  await check("overlay: a screenshot straight after a navigation never shows the edge", async () => {
+    const tab = (await tabIds(b))[0];
+    for (let i = 0; i < 8; i++) {
+      await b.call("navigate", { url: site.url(i % 2 ? "/tools" : "/second"), tabId: tab });
+      const shot = await b.call("screenshot", { tabId: tab });
+      const seen = await pixels(shot.content.find((c) => c.type === "image").data, tab, edgePoints);
+      expect(!seen.px.some(yellow), "round " + i + " shows the edge: " + JSON.stringify(seen.px));
+    }
   });
 
   await check("overlay setting off: nothing is drawn on the page", async () => {
