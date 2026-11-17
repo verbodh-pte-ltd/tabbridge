@@ -4,6 +4,8 @@ import { browserLabel, getSettings, getSites, setSettings, setSite, type Setting
 const BOXES: [string, keyof Settings, boolean][] = [
   ["allSites", "askNewSites", true],
   ["sharedGroup", "sharedGroup", false],
+  ["agentWindow", "agentWindow", false],
+  ["overlay", "overlay", false],
   ["notify", "notify", false],
   ["confirmRisky", "confirmRisky", false],
   ["yolo", "yolo", false],

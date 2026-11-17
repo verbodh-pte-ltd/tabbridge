@@ -62,6 +62,9 @@ const SECOND = `<!doctype html><html><head><title>Second page</title></head><bod
 export function startSite() {
   const server = http.createServer((req, res) => {
     if (req.url === "/api/ping") { res.writeHead(200, { "content-type": "application/json" }); res.end('{"ok":true}'); return; }
+    if (req.url === "/strict") { res.writeHead(200, { "content-type": "text/html", "content-security-policy": "default-src 'none'; style-src 'none'; script-src 'none'" }); res.end("<!doctype html><html><head><title>Acme strict page</title></head><body><h1>Strict</h1><button id=\"s\">Press</button></body></html>"); return; }
+    if (req.url === "/transform") { res.writeHead(200, { "content-type": "text/html" }); res.end("<!doctype html><html style=\"transform:scale(.8);transform-origin:0 0\"><head><title>Acme scaled page</title></head><body><h1>Scaled</h1><button id=\"t\" style=\"margin:60px\">Target</button></body></html>"); return; }
+    if (req.url === "/link") { res.writeHead(200, { "content-type": "text/html" }); res.end("<!doctype html><html><head><title>Acme link page</title></head><body><a id=\"go\" href=\"/second\" style=\"display:inline-block;margin:50px\">Go to the second page</a></body></html>"); return; }
     if (req.url === "/missing") { res.writeHead(404); res.end("no"); return; }
     if (req.url === "/report.txt") { res.writeHead(200, { "content-type": "text/plain", "content-disposition": 'attachment; filename="tabbridge-live-report.txt"' }); res.end("Acme report"); return; }
     res.writeHead(200, { "content-type": "text/html" });

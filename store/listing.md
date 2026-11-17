@@ -28,7 +28,8 @@ What an agent can do
 • Watch each step your agent takes in the live console (Chrome's side panel), and send it a note
 
 You stay in charge
-• Agents only use their own tabs, kept in a TabBridge tab group
+• Agents only use their own tabs, kept in a TabBridge tab group, in a window of their own that never takes your focus
+• A light yellow edge and a pointer show when an agent controls a tab
 • YOLO mode is on at first; switch it off and risky clicks (send, buy, pay, delete, publish…) ask you first
 • Cookie values and tokens are hidden from agents unless you allow them
 • Optionally, be asked before an agent uses each new site

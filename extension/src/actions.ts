@@ -7,6 +7,7 @@ import * as cdp from "./cdp.ts";
 import { elementHandle } from "./inspect.ts";
 import { checkRisky } from "./permissions.ts";
 import type { Session } from "./sessions.ts";
+import * as overlay from "./overlay.ts";
 import { agent, foreground, Refused, sleep, untrusted, usable } from "./tools.ts";
 
 type Args = Record<string, any>;
@@ -54,6 +55,7 @@ export const ACTION_HANDLERS: Record<string, Handler> = {
     const tab = await usable(s, a);
     await foreground(tab);
     const info = await point(tab.id!, a.ref, a.x, a.y);
+    if (await overlay.point(tab.id!, info.x, info.y, "hover")) await sleep(overlay.POINTER_MS);
     await cdp.send(tab.id!, "Input.dispatchMouseEvent", { type: "mouseMoved", x: info.x, y: info.y });
     await sleep(300);
     return textResult(`Hovering over ${untrusted(tab.url, describe(info))}.`);
@@ -69,9 +71,11 @@ export const ACTION_HANDLERS: Record<string, Handler> = {
     // drag, then drop it ourselves. Plain mouse-drag widgets just see the mouse moves.
     await cdp.send(id, "Input.setInterceptDrags", { enabled: true });
     const intercepted = cdp.nextEvent(id, "Input.dragIntercepted", 1500);
+    if (await overlay.point(id, from.x, from.y, "drag")) await sleep(overlay.POINTER_MS);
     try {
       await cdp.send(id, "Input.dispatchMouseEvent", { type: "mouseMoved", x: from.x, y: from.y });
       await cdp.send(id, "Input.dispatchMouseEvent", { type: "mousePressed", x: from.x, y: from.y, button: "left", buttons: 1, clickCount: 1 });
+      void overlay.point(id, to.x, to.y, "drag"); // the pointer travels while the mouse steps
       const steps = 12;
       for (let i = 1; i <= steps; i++) {
         const x = from.x + ((to.x - from.x) * i) / steps;
@@ -101,10 +105,10 @@ export const ACTION_HANDLERS: Record<string, Handler> = {
     const vp = (await cdp.send(tab.id!, "Page.getLayoutMetrics")).cssVisualViewport;
     const dpr = (await cdp.send(tab.id!, "Runtime.evaluate", { expression: "devicePixelRatio", returnByValue: true })).result.value || 1;
     const factor = Math.min(4, Math.max(1, 1200 / width));
-    const shot = await cdp.send(tab.id!, "Page.captureScreenshot", {
+    const shot = await overlay.hidden(tab.id!, () => cdp.send(tab.id!, "Page.captureScreenshot", {
       format: "png",
       clip: { x: vp.pageX + x0, y: vp.pageY + y0, width, height, scale: factor / dpr },
-    });
+    }));
     return {
       content: [
         { type: "image", data: shot.data, mimeType: "image/png" },
@@ -138,6 +142,7 @@ export const ACTION_HANDLERS: Record<string, Handler> = {
       const rec = { frames: [] as { data: string; t: number }[], every: 1000 / fps, last: 0, started: Date.now(),
         timer: undefined as ReturnType<typeof setInterval> | undefined };
       recordings.set(id, rec);
+      await overlay.hold(id); // the recording shows the page alone, like a screenshot
       cdp.frameSinks.set(id, (data, t) => {
         if (t - rec.last < rec.every || rec.frames.length >= MAX_FRAMES) return;
         rec.last = t;
@@ -159,6 +164,7 @@ export const ACTION_HANDLERS: Record<string, Handler> = {
     await cdp.send(id, "Page.stopScreencast").catch(() => {});
     cdp.frameSinks.delete(id);
     recordings.delete(id);
+    await overlay.release(id);
     if (!rec.frames.length) return textResult("No frames were captured: the page didn't change on screen while recording.", true);
     const data = await encodeGif(rec.frames, Date.now());
     const seconds = Math.round((Date.now() - rec.started) / 1000);

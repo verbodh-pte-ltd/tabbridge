@@ -9,6 +9,9 @@ import { checkRisky, checkSite } from "./permissions.ts";
 import { ACTION_HANDLERS } from "./actions.ts";
 import { INSPECT_HANDLERS } from "./inspect.ts";
 import { addToGroup, groupTabs, resolveTab, type Session } from "./sessions.ts";
+import { getSettings } from "./settings.ts";
+import * as agentWindow from "./agent-window.ts";
+import * as overlay from "./overlay.ts";
 
 type Args = Record<string, any>;
 type Handler = (s: Session, a: Args) => Promise<ToolResult>;
@@ -47,6 +50,7 @@ export async function usable(s: Session, a: Args): Promise<chrome.tabs.Tab> {
   const tab = await resolveTab(s, a.tabId);
   const refused = await checkSite(s.session, s.client, tab.url || tab.pendingUrl);
   if (refused) throw new Refused(refused);
+  void overlay.touch(tab.id!);
   return tab;
 }
 
@@ -77,12 +81,23 @@ async function waitForNavigation(tabId: number, fromUrl: string | undefined): Pr
 }
 
 /** A new tab in the agent's group. It starts blank so console and network are captured from the first request. */
+/** A new tab: in the agent window, which never takes the person's focus, unless the setting is off. */
+async function newTab(): Promise<chrome.tabs.Tab> {
+  if (!(await getSettings()).agentWindow) {
+    const windowId = await agentWindow.personWindow();
+    return whenTabsEditable(() => chrome.tabs.create({ ...(windowId !== undefined ? { windowId } : {}), url: "about:blank", active: true }));
+  }
+  const windowId = await agentWindow.existing();
+  if (windowId === undefined) return agentWindow.open();
+  return whenTabsEditable(() => chrome.tabs.create({ windowId, url: "about:blank", active: true }));
+}
+
 async function openTab(s: Session, url?: string): Promise<chrome.tabs.Tab> {
   if (url) {
     const refused = await checkSite(s.session, s.client, url);
     if (refused) throw new Refused(refused);
   }
-  const tab = await whenTabsEditable(() => chrome.tabs.create({ url: "about:blank", active: true }));
+  const tab = await newTab();
   await addToGroup(s, tab.id!);
   s.activeTab = tab.id;
   await cdp.attach(tab.id!).catch(() => {});
@@ -124,7 +139,8 @@ export const HANDLERS: Record<string, Handler> = {
   async tab_select(s, a) {
     const tab = await resolveTab(s, Number(a.tabId));
     await whenTabsEditable(() => chrome.tabs.update(tab.id!, { active: true }));
-    await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
+    // In the agent window nothing needs the window itself in front.
+    if (!(await getSettings()).agentWindow) await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
     await cdp.attach(tab.id!).catch(() => {});
     return textResult(`Selected tab ${tab.id}.`);
   },
@@ -182,15 +198,15 @@ export const HANDLERS: Record<string, Handler> = {
 
   async screenshot(s, a) {
     const tab = await usable(s, a);
-    if (!tab.active) await whenTabsEditable(() => chrome.tabs.update(tab.id!, { active: true }));
+    // A capture needs no tab in front: Chrome draws a background tab on request (measured in plan phase 1).
     const metrics = await cdp.send(tab.id!, "Page.getLayoutMetrics");
     const vp = metrics.cssVisualViewport ?? metrics.visualViewport;
     const dpr = (await cdp.send(tab.id!, "Runtime.evaluate", { expression: "devicePixelRatio", returnByValue: true })).result.value || 1;
-    const shot = await cdp.send(tab.id!, "Page.captureScreenshot", {
+    const shot = await overlay.hidden(tab.id!, () => cdp.send(tab.id!, "Page.captureScreenshot", {
       format: "jpeg",
       quality: 80,
       clip: { x: vp.pageX, y: vp.pageY, width: vp.clientWidth, height: vp.clientHeight, scale: 1 / dpr },
-    });
+    }));
     return {
       content: [
         { type: "image", data: shot.data, mimeType: "image/jpeg" },
@@ -219,6 +235,7 @@ export const HANDLERS: Record<string, Handler> = {
     const button = a.button ?? "left";
     const clicks = Math.min(Math.max(Number(a.clickCount) || 1, 1), 3);
     const modifiers = mouseModifiers(a.modifiers);
+    if (await overlay.point(tab.id!, info.x, info.y, "click")) await sleep(overlay.POINTER_MS);
     await cdp.send(tab.id!, "Input.dispatchMouseEvent", { type: "mouseMoved", x: info.x, y: info.y, modifiers });
     // A double or triple click is a run of presses with a rising clickCount, as a real mouse sends.
     for (let clickCount = 1; clickCount <= clicks; clickCount++) {
@@ -272,6 +289,7 @@ export const HANDLERS: Record<string, Handler> = {
     const vp = (await cdp.send(tab.id!, "Page.getLayoutMetrics")).cssVisualViewport;
     const x = typeof a.x === "number" ? a.x : vp.clientWidth / 2;
     const y = typeof a.y === "number" ? a.y : vp.clientHeight / 2;
+    if (await overlay.point(tab.id!, x, y, "scroll")) await sleep(overlay.POINTER_MS);
     await cdp.send(tab.id!, "Input.dispatchMouseEvent", {
       type: "mouseWheel", x, y,
       deltaX: dir === "left" ? -amount : dir === "right" ? amount : 0,
@@ -358,7 +376,12 @@ export const HANDLERS: Record<string, Handler> = {
 
   async resize_window(s, a) {
     const tab = await resolveTab(s, a.tabId);
-    const win = await chrome.windows.update(tab.windowId, { state: "normal", width: Math.round(a.width), height: Math.round(a.height) });
+    const width = Math.round(a.width), height = Math.round(a.height);
+    // The agent window sits at the right edge of the screen. It keeps that edge, so a wider window grows to the left
+    // instead of off the screen, which Chrome refuses.
+    const cur = await chrome.windows.get(tab.windowId);
+    const atRight = (await agentWindow.existing()) === tab.windowId && cur.left !== undefined && cur.width !== undefined;
+    const win = await chrome.windows.update(tab.windowId, { state: "normal", width, height, ...(atRight ? { left: Math.max(0, cur.left! + cur.width! - width) } : {}) });
     const note = Math.abs((win.width ?? 0) - Math.round(a.width)) > 20 ? " Chrome has a minimum window width (about 500 px), so it may be wider than asked." : "";
     return textResult(`Window is now ${win.width}×${win.height}.${note}`);
   },

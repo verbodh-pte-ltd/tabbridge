@@ -34,6 +34,9 @@ If more than one Chrome runs TabBridge, `browsers` lists them by name; pick with
   `find` again when told "No element … any more".
 - `get_page_text` for reading content; `wait_for` with `text` after an action that loads something.
 - You can only use your own tabs (the "TabBridge" tab group) and tabs the person sends you.
+- Your tabs are in a window of their own that does not take the person's focus. The person sees a
+  light yellow edge and a pointer on the tab you control; screenshots show neither. If they turned
+  the agent window off in Settings, your tabs are in a tab group in their window.
 
 ## 3. Act
 

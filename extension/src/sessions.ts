@@ -4,6 +4,7 @@
 // drags into the group; it can't use another agent's tabs.
 
 import { whenTabsEditable } from "./retry.ts";
+import * as agentWindow from "./agent-window.ts";
 import { getSettings } from "./settings.ts";
 
 export interface Session {
@@ -91,15 +92,28 @@ export async function groupTabs(s: Session): Promise<chrome.tabs.Tab[]> {
   return tabs;
 }
 
-export async function addToGroup(s: Session, tabId: number): Promise<void> {
+// Two agents opening their first tab together would each create the shared group, and one group would be lost.
+let grouping: Promise<unknown> = Promise.resolve();
+
+export function addToGroup(s: Session, tabId: number): Promise<void> {
+  const run = grouping.then(() => addToGroupNow(s, tabId));
+  grouping = run.catch(() => {});
+  return run;
+}
+
+async function addToGroupNow(s: Session, tabId: number): Promise<void> {
   s.tabs.add(tabId);
-  const shared = (await getSettings()).sharedGroup;
-  const existing = await groupFor(s);
+  const settings = await getSettings();
+  const shared = settings.sharedGroup;
+  const tab = await chrome.tabs.get(tabId);
+  let existing = await groupFor(s);
+  // A group in another window (the agent window setting changed) would pull this tab out of its window.
+  if (existing !== undefined && (await chrome.tabGroups.get(existing)).windowId !== tab.windowId) existing = undefined;
   if (existing !== undefined) {
     await whenTabsEditable(() => chrome.tabs.group({ groupId: existing, tabIds: [tabId] }));
     return;
   }
-  const id = await whenTabsEditable(() => chrome.tabs.group({ tabIds: [tabId] }));
+  const id = await whenTabsEditable(() => chrome.tabs.group({ tabIds: [tabId], createProperties: { windowId: tab.windowId } }));
   if (shared) {
     sharedGroupId = id;
     await whenTabsEditable(() => chrome.tabGroups.update(id, { title: groupTitle("TabBridge"), color: BRAND_COLOR, collapsed: false }));
@@ -138,7 +152,11 @@ export async function shareTab(tabId: number): Promise<boolean> {
   if (sharedGroupId !== undefined) {
     await whenTabsEditable(() => chrome.tabs.group({ groupId: sharedGroupId, tabIds: [tabId] }));
   } else {
-    const created = await whenTabsEditable(() => chrome.tabs.group({ tabIds: [tabId] }));
+    // With the agent window on, the handed tab moves into it, so the group never pulls agent tabs out.
+    const useWindow = (await getSettings()).agentWindow;
+    if (useWindow && (await agentWindow.existing()) === undefined) await agentWindow.open(tabId);
+    const windowId = useWindow ? await agentWindow.existing() : undefined;
+    const created = await whenTabsEditable(() => chrome.tabs.group({ tabIds: [tabId], ...(windowId !== undefined ? { createProperties: { windowId } } : {}) }));
     sharedGroupId = created;
     await whenTabsEditable(() => chrome.tabGroups.update(created, { title: groupTitle("TabBridge"), color: BRAND_COLOR, collapsed: false }));
   }

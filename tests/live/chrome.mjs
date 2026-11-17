@@ -24,7 +24,7 @@ export function findChrome() {
   return found;
 }
 
-export async function launch(extensionDir) {
+export async function launch(extensionDir, { real = false } = {}) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "tabbridge-live-"));
   // On macOS and Linux, Chrome looks for native hosts inside --user-data-dir, not in the everyday
   // profile's folder where `tabbridge install` put it. Windows uses the registry instead.
@@ -40,15 +40,18 @@ export async function launch(extensionDir) {
     "--no-first-run",
     "--no-default-browser-check",
     "--disable-search-engine-choice-screen",
-    "--window-size=1280,900",
+    ...(real ? [] : ["--window-size=1280,900"]),
     // TABBRIDGE_HEADLESS=1: no window on the screen, so the test can run while someone works.
     ...(process.env.TABBRIDGE_HEADLESS ? ["--headless=new"] : []),
     // The test window is often behind other windows. Chrome would stop drawing it, which drops
     // screencast frames and delays input; keep it drawing as if it were in front.
-    "--disable-features=CalculateNativeWinOcclusion",
-    "--disable-backgrounding-occluded-windows",
-    "--disable-renderer-backgrounding",
-    "--disable-background-timer-throttling",
+    // real: leave Chrome's own behaviour on, to measure what a person's Chrome does.
+    ...(real ? [] : [
+      "--disable-features=CalculateNativeWinOcclusion",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-renderer-backgrounding",
+      "--disable-background-timer-throttling",
+    ]),
     "about:blank",
   ], { stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"] });
 
