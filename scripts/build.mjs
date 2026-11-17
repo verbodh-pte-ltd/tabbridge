@@ -31,6 +31,7 @@ const web = { bundle: true, format: "esm", target: "chrome116", logLevel: "warni
 await build({ ...web, entryPoints: ["background.ts", "popup.tsx", "sidepanel.tsx", "options.ts"].map((n) => r(`extension/src/${n}`)),
   outdir: r("extension/dist"), splitting: true, chunkNames: "chunks/[name]-[hash]", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' }, minify: true });
 await build({ ...web, format: "iife", entryPoints: [r("extension/src/page-agent.ts")], outfile: r("extension/dist/page-agent.js") });
+await build({ ...web, format: "iife", entryPoints: [r("extension/src/overlay-page.ts")], outfile: r("extension/dist/overlay-page.js") });
 fs.cpSync(r("extension/static"), r("extension/dist"), { recursive: true });
 // The pane and the approval window use shadcn/ui components, styled with Tailwind.
 execFileSync(process.execPath, [r("node_modules/@tailwindcss/cli/dist/index.mjs"), "-i", r("extension/src/ui/theme.css"),

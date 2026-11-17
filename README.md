@@ -132,6 +132,14 @@ Also:
 - **Agents only use their own tabs.** Tabs an agent opens go in the **TabBridge** tab group. An agent
   can't use your other tabs, or another agent's, unless you drag a tab into the group or send it
   with the right-click menu.
+- **Agents work in a window of their own.** The agent window opens on the right of your screen
+  and never takes the focus of your own window, so you keep working in your tabs. It can open
+  behind your window when they overlap. Turn it off in Settings ("Work in a window of its own") to
+  use a tab group in your own window instead.
+- **You can see when an agent controls a tab.** The page gets a light yellow edge, and a small
+  pointer moves to where the agent clicks, hovers, drags or scrolls. Both go away 3 seconds after
+  the agent's last step. Screenshots the agent receives show neither. Turn them off in Settings
+  ("Show when an agent controls a tab").
 - **Optional: ask before each new site.** Then you choose allow once, always allow, or block.
 - **Page text is marked untrusted.** Everything read from a page comes back inside
   `<untrusted-page-content>`, and agents are told to treat it as data. This reduces prompt injection

@@ -48,7 +48,8 @@ const site = await startSite();
 const chrome = await launch(path.join(ROOT, "extension", "dist"));
 const settings = (browser, patch) => browser.extEval(`chrome.storage.local.get("settings").then(x => chrome.storage.local.set({ settings: { ...(x.settings || {}), ...${JSON.stringify(patch)} } }))`);
 await sleep(1500);
-await settings(chrome, { browserName: LABEL });
+// TABBRIDGE_LIVE_SETTINGS='{"agentWindow":false,"overlay":false}' runs the suite as it was before the agent window and the overlay.
+await settings(chrome, { browserName: LABEL, ...JSON.parse(process.env.TABBRIDGE_LIVE_SETTINGS ?? "{}") });
 const a = new BridgeClient("agent-a");
 const b = new BridgeClient("agent-b");
 let downloaded = null;
@@ -553,7 +554,8 @@ try {
   });
 
   await check("resize_window", async () => {
-    expect(/Window is now 9\d\d×/.test(text(await b.call("resize_window", { width: 900, height: 700 }))), "not resized");
+    const resized = text(await b.call("resize_window", { width: 900, height: 700 }));
+    expect(/Window is now 9\d\d×/.test(resized), `not resized: ${resized}`);
   });
 
   await check("tab_create opens a second tab only when asked; tab_close removes it", async () => {
@@ -569,6 +571,263 @@ try {
     const r = await b.call("click", { ref: "e9999" });
     expect(r.isError && /fresh refs/.test(text(r)), text(r));
   });
+
+  // ---- The agent window, the yellow edge and the pointer (plan feat/agent-window-pointer-edge) ----
+  const winState = async () => JSON.parse(await chrome.extEval(`(async () => {
+    const saved = (await chrome.storage.session.get("agentWindow")).agentWindow ?? null;
+    const wins = await chrome.windows.getAll({ windowTypes: ["normal"], populate: true });
+    const last = await chrome.windows.getLastFocused();
+    return JSON.stringify({ saved, last: last.id, person: wins.filter((w) => w.id !== saved).map((w) => [w.id, w.tabs.find((t) => t.active)?.id]), windows: wins.length });
+  })()`));
+  const personView = (s) => JSON.stringify([s.last, s.person]);
+  const tabIds = async (client) => [...text(await client.call("tabs_list", {})).matchAll(/tab (\d+):/g)].map((m) => Number(m[1]));
+  const overlayOf = async (tabId) => JSON.parse(await chrome.extEval(`chrome.scripting.executeScript({ target: { tabId: ${tabId} }, func: () => JSON.stringify(globalThis.__tbOverlay?.report() ?? null) }).then((r) => r[0].result)`));
+
+  await check("agent window: no tool changes the person's active tab or focused window", async () => {
+    await b.call("navigate", { url: site.url("/tools") });
+    const calls = {
+      navigate: async () => b.call("navigate", { url: site.url("/tools") }),
+      click: async () => b.call("click", await at(b, "dbl")),
+      type: async () => b.call("type", { text: "hi" }),
+      key: async () => b.call("key", { keys: "End" }),
+      hover: async () => b.call("hover", await at(b, "hov")),
+      drag: async () => { const f = await at(b, "card"), t = await at(b, "zone"); return b.call("drag", { fromX: f.x, fromY: f.y, toX: t.x, toY: t.y }); },
+      scroll: async () => b.call("scroll", { direction: "down", amount: 100 }),
+      screenshot: async () => b.call("screenshot", {}),
+      tab_select: async () => b.call("tab_select", { tabId: (await tabIds(b))[0] }),
+      tab_create: async () => b.call("tab_create", { url: site.url("/second") }),
+    };
+    const first = await winState();
+    expect(first.saved !== null && first.person.length >= 1, "no agent window yet: " + JSON.stringify(first));
+    for (const [name, call] of Object.entries(calls)) {
+      const before = await winState();
+      const r = await call();
+      expect(!r.isError, name + ": " + text(r));
+      const after = await winState();
+      expect(personView(before) === personView(after), name + " changed the person's view: " + personView(before) + " -> " + personView(after));
+    }
+    for (const id of (await tabIds(b)).slice(1)) await b.call("tab_close", { tabId: id });
+  });
+
+  await check("agent window setting off: tabs open in the person's window, as before", async () => {
+    await settings(chrome, { agentWindow: false });
+    try {
+      const c = new BridgeClient("agent-c");
+      const r = await c.call("tab_create", { url: site.url("/second") });
+      const id = Number(text(r).match(/tab (\d+)/)?.[1]);
+      const where = JSON.parse(await chrome.extEval(`Promise.all([chrome.tabs.get(${id}), chrome.storage.session.get("agentWindow")]).then(([t, s]) => JSON.stringify({ win: t.windowId, agent: s.agentWindow ?? null }))`));
+      expect(where.agent === null || where.win !== where.agent, "the tab went to the agent window: " + JSON.stringify(where));
+      await c.call("tab_close", { tabId: id });
+      c.close();
+    } finally {
+      await settings(chrome, { agentWindow: true });
+    }
+  });
+
+  await check("agent window: closed by the person, the next call opens a fresh one; a tab moved out is refused", async () => {
+    const before = await winState();
+    await chrome.extEval(`chrome.windows.remove(${before.saved})`);
+    await sleep(500);
+    const r = await b.call("navigate", { url: site.url("/second") });
+    expect(!r.isError && /Second page/.test(text(r)), text(r));
+    const after = await winState();
+    expect(after.saved !== null && after.saved !== before.saved, "no new window: " + JSON.stringify(after));
+    const made = await b.call("tab_create", { url: site.url("/second") });
+    const id = Number(text(made).match(/tab (\d+)/)?.[1]);
+    const person = after.person[0][0];
+    const quiet = await winState();
+    await chrome.extEval(`chrome.tabs.move(${id}, { windowId: ${person}, index: -1 })`);
+    const moved = await b.call("click", { tabId: id, x: 10, y: 10 });
+    expect(moved.isError && /isn't one of this agent's TabBridge tabs/.test(text(moved)), text(moved));
+    await chrome.extEval(`chrome.tabs.remove(${id})`);
+    const end = await winState();
+    expect(personView(quiet) === personView(end), "the person's view changed: " + personView(quiet) + " -> " + personView(end));
+  });
+
+  await check("agent window: two agents share one window and each screenshot shows its own page", async () => {
+    await a.call("navigate", { url: site.url("/second") });
+    await b.call("navigate", { url: site.url("/tools") });
+    const s = await winState();
+    expect(s.windows === s.person.length + 1, "expected one agent window: " + JSON.stringify(s));
+    const shotA = text(await a.call("screenshot", {}));
+    const shotB = text(await b.call("screenshot", {}));
+    expect(shotA.includes("Second page") && shotB.includes("Acme widgets"), shotA + "\n" + shotB);
+  });
+
+  await check("agent window: its id survives in session storage for a restarted worker", async () => {
+    const s = await winState();
+    const live = await chrome.extEval(`chrome.windows.get(${s.saved}).then((w) => w.id)`);
+    expect(live === s.saved, "saved id " + s.saved + " is not a live window");
+  });
+
+  const edgeTab = async () => {
+    const r = await b.call("tab_create", { url: site.url("/tools") });
+    const id = Number(text(r).match(/tab (\d+)/)?.[1]);
+    await b.call("tab_select", { tabId: id });
+    return id;
+  };
+  let ovTab = 0;
+
+  await check("overlay: the edge shows while the agent works and goes 3 s after the last call", async () => {
+    ovTab = await edgeTab();
+    await b.call("get_page_text", { tabId: ovTab });
+    await sleep(300);
+    const on = await overlayOf(ovTab);
+    expect(on?.visible && on.attached && on.edgeWidth > 300, "not on: " + JSON.stringify(on));
+    await sleep(3400);
+    const off = await overlayOf(ovTab);
+    expect(off && !off.visible, "still on: " + JSON.stringify(off));
+  });
+
+  await check("overlay: the pointer lands on the target of click, hover, drag and scroll", async () => {
+    const near = (p, want, what) => expect(p && Math.abs(p.x - want.x) <= 2 && Math.abs(p.y - want.y) <= 2, what + ": pointer " + JSON.stringify(p) + ", target " + JSON.stringify(want));
+    const target = await at(b, "dbl");
+    await b.call("click", { tabId: ovTab, ...target });
+    await sleep(500);
+    near((await overlayOf(ovTab)).pointer, target, "click");
+    const hov = await at(b, "hov");
+    await b.call("hover", { tabId: ovTab, ...hov });
+    await sleep(500);
+    near((await overlayOf(ovTab)).pointer, hov, "hover");
+    const from = await at(b, "card"), to = await at(b, "zone");
+    await b.call("drag", { tabId: ovTab, fromX: from.x, fromY: from.y, toX: to.x, toY: to.y });
+    await sleep(500);
+    near((await overlayOf(ovTab)).pointer, to, "drag");
+    await b.call("scroll", { tabId: ovTab, direction: "down", amount: 50, x: 300, y: 200 });
+    await sleep(500);
+    near((await overlayOf(ovTab)).pointer, { x: 300, y: 200 }, "scroll");
+  });
+
+  await check("overlay: takes no click, shifts no layout, and the page cannot reach it", async () => {
+    await js(b, "window.__edge = 0; document.addEventListener('click', () => { window.__edge++; }); document.documentElement.scrollHeight");
+    const height = await js(b, "document.documentElement.scrollHeight");
+    await b.call("click", { tabId: ovTab, x: 2, y: 2 });
+    await sleep(400);
+    expect((await overlayOf(ovTab)).visible, "overlay not on");
+    expect(Number(await js(b, "window.__edge")) === 1, "the click did not reach the page");
+    expect((await js(b, "document.documentElement.scrollHeight")) === height, "the layout moved");
+    const reach = JSON.parse(await js(b, "(() => { const h = document.querySelector('tabbridge-overlay'); return { host: !!h, shadow: h ? h.shadowRoot : null, api: typeof globalThis.__tbOverlay }; })()"));
+    expect(reach.host && reach.shadow === null && reach.api === "undefined", JSON.stringify(reach));
+  });
+
+  const pixels = (src, tabId, points) => chrome.extEval(`(async () => {
+    const data = ${src === "raw" ? `(await chrome.debugger.sendCommand({ tabId: ${tabId} }, "Page.captureScreenshot", { format: "jpeg", quality: 90 })).data` : JSON.stringify(src)};
+    const bm = await createImageBitmap(await (await fetch("data:" + (data.startsWith("iVBOR") ? "image/png" : "image/jpeg") + ";base64," + data)).blob());
+    const c = new OffscreenCanvas(bm.width, bm.height); const g = c.getContext("2d"); g.drawImage(bm, 0, 0);
+    return JSON.stringify({ w: bm.width, h: bm.height, px: ${JSON.stringify(points)}.map(([x, y]) => Array.from(g.getImageData(x < 0 ? bm.width + x : x, y < 0 ? bm.height + y : y, 1, 1).data).slice(0, 3)) });
+  })()`).then(JSON.parse);
+  const yellow = (p) => p[0] > 200 && p[1] > 180 && p[2] < 190;
+  const edgePoints = [[1, 200], [-2, 200], [400, 1], [400, -2]];
+
+  await check("overlay: a screenshot shows no edge, though the page shows it", async () => {
+    await b.call("click", { tabId: ovTab, x: 300, y: 300 });
+    await sleep(500);
+    const raw = await pixels("raw", ovTab, edgePoints);
+    expect(raw.px.some(yellow), "the raw capture shows no yellow edge: " + JSON.stringify(raw.px));
+    const shot = await b.call("screenshot", { tabId: ovTab });
+    const image = shot.content.find((c) => c.type === "image").data;
+    const seen = await pixels(image, ovTab, edgePoints);
+    expect(!seen.px.some(yellow), "the screenshot shows the edge: " + JSON.stringify(seen.px));
+    await sleep(300);
+    expect((await overlayOf(ovTab)).visible, "the edge did not come back after the screenshot");
+  });
+
+  await check("overlay: a strict page policy, a removed host and a chrome:// page do not break a tool", async () => {
+    const strict = await b.call("navigate", { url: site.url("/strict"), tabId: ovTab });
+    expect(!strict.isError, text(strict));
+    const press = await b.call("click", { tabId: ovTab, ref: await refFor(b, "Press") });
+    expect(!press.isError, text(press));
+    await sleep(300);
+    expect((await overlayOf(ovTab))?.visible, "no overlay on a strict page");
+    await js(b, "document.querySelector('tabbridge-overlay')?.remove()");
+    expect(!(await b.call("get_page_text", { tabId: ovTab })).isError, "tool failed after the page removed the host");
+    await sleep(300);
+    expect((await overlayOf(ovTab)).attached, "the host was not put back");
+    try {
+      const chromePage = await b.call("navigate", { url: "chrome://version", tabId: ovTab });
+      expect(!chromePage.isError, "navigate to chrome://: " + text(chromePage));
+      const read = await b.call("read_page", { tabId: ovTab });
+      // Tools that read the page already refuse a chrome:// page; the overlay adds no error of its own.
+      expect(!read.isError || /Cannot access a chrome:\/\/ URL/.test(text(read)), "read_page on chrome://: " + text(read));
+      expect(!/overlay|tbOverlay/i.test(text(read)), "the overlay leaked into an error: " + text(read));
+    } finally {
+      await b.call("navigate", { url: site.url("/tools"), tabId: ovTab });
+    }
+  });
+
+  await check("overlay: with reduced motion the pointer is at the target at once", async () => {
+    await b.call("screenshot", { tabId: ovTab }); // a tool that uses the debugger attaches it again after the chrome:// page
+    await chrome.extEval(`chrome.debugger.sendCommand({ tabId: ${ovTab} }, "Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] })`);
+    try {
+      const target = await at(b, "mod");
+      await b.call("hover", { tabId: ovTab, ...target });
+      const p = (await overlayOf(ovTab)).pointer;
+      expect(p && Math.abs(p.x - target.x) <= 2 && Math.abs(p.y - target.y) <= 2, "pointer " + JSON.stringify(p) + ", target " + JSON.stringify(target));
+    } finally {
+      await chrome.extEval(`chrome.debugger.sendCommand({ tabId: ${ovTab} }, "Emulation.setEmulatedMedia", { features: [] })`);
+    }
+  });
+
+  await check("overlay: a transform on the page's root and a link that navigates leave the pointer and the edge right", async () => {
+    const near = (p, want, what) => expect(p && Math.abs(p.x - want.x) <= 2 && Math.abs(p.y - want.y) <= 2, what + ": pointer " + JSON.stringify(p) + ", target " + JSON.stringify(want));
+    await b.call("navigate", { url: site.url("/transform"), tabId: ovTab });
+    const target = await at(b, "t");
+    await b.call("click", { tabId: ovTab, ...target });
+    await sleep(500);
+    near((await overlayOf(ovTab)).pointer, target, "scaled root");
+    await b.call("navigate", { url: site.url("/link"), tabId: ovTab });
+    const go = await at(b, "go");
+    const r = await b.call("click", { tabId: ovTab, ...go });
+    expect(!r.isError, text(r));
+    await sleep(800);
+    await b.call("get_page_text", { tabId: ovTab });
+    await sleep(300);
+    const after = await overlayOf(ovTab);
+    expect(after?.attached && after.visible, "no overlay after the page navigated: " + JSON.stringify(after));
+  });
+
+  await check("overlay: calls at once never leave the edge in a screenshot or a zoom, and a recording holds it off", async () => {
+    await b.call("navigate", { url: site.url("/tools"), tabId: ovTab });
+    const hov = await at(b, "hov");
+    for (let i = 0; i < 4; i++) {
+      const [shot] = await Promise.all([b.call("screenshot", { tabId: ovTab }), b.call("hover", { tabId: ovTab, ...hov }), b.call("click", { tabId: ovTab, x: 300 + i, y: 300 })]);
+      const seen = await pixels(shot.content.find((c) => c.type === "image").data, ovTab, edgePoints);
+      expect(!seen.px.some(yellow), "round " + i + " shows the edge: " + JSON.stringify(seen.px));
+    }
+    await b.call("hover", { tabId: ovTab, ...hov });
+    const zoom = await b.call("zoom", { tabId: ovTab, x0: 0, y0: 0, x1: 60, y1: 60 });
+    const zoomed = await pixels(zoom.content.find((c) => c.type === "image").data, ovTab, [[3, 3], [3, 100], [100, 3]]);
+    expect(!zoomed.px.some(yellow), "the zoom shows the edge: " + JSON.stringify(zoomed.px));
+    process.env.TABBRIDGE_GUIDE = "0";
+    try {
+      await b.call("gif_record", { tabId: ovTab, action: "start" });
+      await b.call("hover", { tabId: ovTab, ...hov });
+      await sleep(300);
+      const during = await overlayOf(ovTab);
+      expect(during && !during.visible, "the overlay showed during a recording: " + JSON.stringify(during));
+      await b.call("gif_record", { tabId: ovTab, action: "stop" });
+    } finally {
+      delete process.env.TABBRIDGE_GUIDE;
+    }
+    await b.call("hover", { tabId: ovTab, ...hov });
+    await sleep(300);
+    expect((await overlayOf(ovTab)).visible, "the overlay did not come back after the recording");
+  });
+
+  await check("overlay setting off: nothing is drawn on the page", async () => {
+    await settings(chrome, { overlay: false });
+    try {
+      await b.call("navigate", { url: site.url("/second"), tabId: ovTab });
+      await b.call("get_page_text", { tabId: ovTab });
+      await sleep(300);
+      expect((await overlayOf(ovTab)) === null, "an overlay was installed");
+      expect((await js(b, "!!document.querySelector('tabbridge-overlay')")) === "false", "a host is on the page");
+    } finally {
+      await settings(chrome, { overlay: true });
+    }
+    await b.call("tab_close", { tabId: ovTab });
+  });
+
 } finally {
   a.close();
   b.close();

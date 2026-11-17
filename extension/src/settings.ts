@@ -8,6 +8,8 @@ export interface Settings {
   showSecrets: boolean;   // let agents read cookie values, auth headers and token-like storage
   browserName: string;    // how agents tell this Chrome apart when several run TabBridge ("" = automatic)
   yolo: boolean;          // YOLO mode: ask nothing (no site or risky-action questions); blocked sites stay blocked
+  agentWindow: boolean;   // an agent works in a window of its own that its calls never focus, not in your window
+  overlay: boolean;       // a light yellow edge and a pointer on a tab an agent controls
 }
 
 export type SiteRule = "allow" | "block";
@@ -15,7 +17,7 @@ export type SiteRule = "allow" | "block";
 // Granted by default; the user turns off what they don't want (Settings page, or the pane).
 // YOLO mode starts on, so agents aren't stopped by questions (owner's call); switching it off
 // brings back the risky-action question. Secret values (cookies, tokens) stay hidden either way.
-export const DEFAULT_SETTINGS: Settings = { askNewSites: false, confirmRisky: true, sharedGroup: true, notify: true, showSecrets: false, browserName: "", yolo: true };
+export const DEFAULT_SETTINGS: Settings = { askNewSites: false, confirmRisky: true, sharedGroup: true, notify: true, showSecrets: false, browserName: "", yolo: true, agentWindow: true, overlay: true };
 
 export async function getSettings(): Promise<Settings> {
   const { settings } = await chrome.storage.local.get("settings");

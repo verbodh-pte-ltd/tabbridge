@@ -5,6 +5,7 @@ import { HOST_NAME, PROTOCOL_VERSION, type HostToExtension } from "../../bridge/
 import { setUpMenus } from "./capture.ts";
 import { startStep } from "./activity.ts";
 import { endSession, onApprovalsChanged, pendingCount } from "./permissions.ts";
+import * as overlay from "./overlay.ts";
 import { allSessions, closeSession, getSession, groupTabs, openSession, setConnected } from "./sessions.ts";
 import { browserLabel, type Status } from "./settings.ts";
 import { runTool } from "./tools.ts";
@@ -44,6 +45,7 @@ function connect(): void {
   port.onDisconnect.addListener(() => {
     const why = chrome.runtime.lastError?.message;
     port = null;
+    void overlay.stopAll();
     for (const s of allSessions()) { closeSession(s.session); endSession(s.session); }
     scheduleRetry(why);
   });
