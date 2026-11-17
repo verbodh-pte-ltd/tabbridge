@@ -17,7 +17,8 @@ Call `tabs_list`. Three outcomes:
 - **"TabBridge can't reach Chrome…":** Chrome is closed or the extension is off. Ask the person to
   open Chrome and check the TabBridge icon has no red "!". Don't retry in a loop.
 - **The tools don't exist at all:** TabBridge isn't set up. Give the person these steps and stop:
-  1. Add the TabBridge extension to Chrome (Chrome Web Store, or load unpacked from the repo).
+  1. Add the TabBridge extension to Chrome: the Chrome Web Store, or run `npx @verbodhpteltd/tabbridge extension`,
+     which copies it to `~/.tabbridge/extension`, then Load unpacked on `chrome://extensions` with Developer mode on.
   2. Run once: `npx @verbodhpteltd/tabbridge install`
   3. Connect this agent, for example `claude mcp add tabbridge -- npx -y @verbodhpteltd/tabbridge mcp`
      (other agents: `npx @verbodhpteltd/tabbridge config codex|gemini|cursor`), then restart the agent.

@@ -136,7 +136,7 @@ export async function doctor(): Promise<boolean> {
     s.once("error", () => resolve(false));
   });
   add("Chrome extension connected", running && fs.existsSync(tokenPath()),
-    "open Chrome and check the TabBridge extension is turned on (chrome://extensions)");
+    "open Chrome and check the TabBridge extension is turned on (chrome://extensions). Not added yet? Run: tabbridge extension");
 
   for (const [name, ok, fix] of checks) console.log(`${ok ? "✓" : "✗"} ${name}${ok ? "" : `  →  ${fix}`}`);
   return checks.every(([, ok]) => ok);

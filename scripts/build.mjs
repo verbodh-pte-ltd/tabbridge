@@ -38,4 +38,7 @@ execFileSync(process.execPath, [r("node_modules/@tailwindcss/cli/dist/index.mjs"
   "-o", r("extension/dist/ui.css"), "--minify"], { stdio: ["ignore", "ignore", "inherit"] });
 
 for (const f of ["README.md", "LICENSE"]) if (fs.existsSync(r(f))) fs.copyFileSync(r(f), r("bridge", f));
+// The package carries the extension too: `tabbridge extension` copies it to ~/.tabbridge/extension.
+fs.rmSync(r("bridge/extension"), { recursive: true, force: true });
+fs.cpSync(r("extension/dist"), r("bridge/extension"), { recursive: true });
 console.log(`built ${version}: bridge/dist, extension/dist`);

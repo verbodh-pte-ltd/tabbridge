@@ -553,6 +553,39 @@ try {
     }
   });
 
+  await check("tabbridge extension: the copied folder loads in Chrome and connects to the host", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "tabbridge-ext-home-"));
+    const first = spawnSync(process.execPath, [CLI, "extension"], { env: { ...process.env, TABBRIDGE_HOME: home }, encoding: "utf8" });
+    expect(first.status === 0 && first.stdout.includes("Load unpacked") && first.stdout.includes(path.join(home, "extension")), first.stdout + first.stderr);
+    const second = spawnSync(process.execPath, [CLI, "extension"], { env: { ...process.env, TABBRIDGE_HOME: home }, encoding: "utf8" });
+    expect(second.status === 0 && second.stdout.includes("Reload"), second.stdout + second.stderr);
+    const copied = path.join(home, "extension");
+    const same = (d) => fs.readdirSync(d, { recursive: true }).map(String).sort().join();
+    expect(same(copied) === same(path.join(ROOT, "extension", "dist")), "the copy differs from extension/dist");
+    const chrome3 = await launch(copied);
+    try {
+      await sleep(1500);
+      await settings(chrome3, { browserName: "tabbridge-live-c" });
+      await sleep(800);
+      const c = new BridgeClient("agent-copy");
+      const { browsersTool } = await import("../../bridge/src/bridge-tools.ts");
+      let list = "";
+      for (let i = 0; i < 40; i++) {
+        list = text(await browsersTool(c, {}));
+        if (/tabbridge-live-c/.test(list)) break;
+        await sleep(250);
+      }
+      expect(/tabbridge-live-c/.test(list), "the copied extension did not connect: " + list);
+      await browsersTool(c, { select: "tabbridge-live-c" });
+      const r = await c.call("tabs_list", {});
+      expect(!r.isError, text(r));
+      c.close();
+    } finally {
+      await chrome3.close();
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   await check("resize_window", async () => {
     const resized = text(await b.call("resize_window", { width: 900, height: 700 }));
     expect(/Window is now 9\d\d×/.test(resized), `not resized: ${resized}`);

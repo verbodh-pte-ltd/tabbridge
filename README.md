@@ -38,6 +38,10 @@ You need Chrome (or Edge or Brave) and Node.js 20 or newer.
    A copy loaded with **Load unpacked** (from `tabbridge-extension-<version>.zip` on the
    [latest GitHub release](https://github.com/verbodh-pte-ltd/tabbridge/releases/latest)) also works, but
    Chrome switches it off unless **Developer mode** stays on, because the store has not reviewed it.
+   The npm package carries the extension too, at the same version. Run `tabbridge extension` (or
+   `npx @verbodhpteltd/tabbridge extension`): it copies the extension to `~/.tabbridge/extension` and
+   prints the steps. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and
+   choose that folder. After an update, run the command again and click **Reload** on the TabBridge card.
 3. **Connect your agent:**
 
    ```

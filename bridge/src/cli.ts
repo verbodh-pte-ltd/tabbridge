@@ -1,7 +1,11 @@
 import { browsersTool, isResult, prepareUpload } from "./bridge-tools.ts";
 import { BridgeClient } from "./client.ts";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { copyExtension, describeCopy } from "./extension-copy.ts";
 import { GuideRecorder } from "./guide.ts";
 import { doctor, install, uninstall } from "./install.ts";
+import { homeDir } from "./paths.ts";
 import { TOOLS } from "./shared/tools.ts";
 import { VERSION } from "./version.ts";
 
@@ -21,6 +25,7 @@ args = ["-y", "@verbodhpteltd/tabbridge", "mcp"]`,
 const HELP = `TabBridge ${VERSION}: lets any AI agent use your Chrome.
 
   tabbridge install [--extension-id <id>]   register the host with Chrome (once per computer)
+  tabbridge extension                       copy the extension to ~/.tabbridge/extension, to load in Chrome
   tabbridge doctor                          check the setup, say what to fix
   tabbridge uninstall                       remove the host
   tabbridge config <claude|codex|gemini|cursor|json>
@@ -38,6 +43,17 @@ async function main(argv: string[]): Promise<number> {
       for (let i = 0; i < rest.length; i++) if (rest[i] === "--extension-id" && rest[i + 1]) ids.push(rest[++i]);
       install(ids);
       return 0;
+    }
+    case "extension": {
+      try {
+        // The package keeps the extension next to dist/ (and next to src/ when run from the repository).
+        const from = fileURLToPath(new URL("../extension", import.meta.url));
+        console.log(describeCopy(copyExtension({ from, to: path.join(homeDir(), "extension") })));
+        return 0;
+      } catch (err: any) {
+        console.error(err?.message ?? String(err));
+        return 1;
+      }
     }
     case "uninstall":
       uninstall();
