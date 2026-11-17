@@ -29,7 +29,8 @@ export function copyExtension({ from, to }: { from: string; to: string }): CopyR
 
   const previous = versionOf(to);
   const replaced = fs.existsSync(to);
-  fs.mkdirSync(path.dirname(to), { recursive: true });
+  // The home folder also holds the host token and pipe: if this command makes it first, it stays private, as install() makes it.
+  fs.mkdirSync(path.dirname(to), { recursive: true, mode: 0o700 });
   const temp = `${to}.new-${process.pid}`;
   fs.rmSync(temp, { recursive: true, force: true });
   fs.cpSync(from, temp, { recursive: true });

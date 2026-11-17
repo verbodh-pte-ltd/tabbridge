@@ -52,6 +52,13 @@ test("it refuses a destination that is not named extension, and touches nothing 
   assert.deepEqual(fs.readdirSync(h).sort(), ["extension", "keep.txt"]);
 });
 
+test("a home folder the command has to create is private to the person", { skip: process.platform === "win32" }, () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "tb-ext-new-"));
+  const homeFolder = path.join(parent, "tabbridge-home");
+  copyExtension({ from: source(), to: path.join(homeFolder, "extension") });
+  assert.equal(fs.statSync(homeFolder).mode & 0o777, 0o700);
+});
+
 test("a source with no manifest is a plain error that says to build", () => {
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), "tb-ext-empty-"));
   assert.throws(() => copyExtension({ from: empty, to: path.join(home(), "extension") }), /npm run build/);
