@@ -10,6 +10,17 @@ const INK = "#1b211d";
 const IDLE_MS = 3000;
 const MOVE_MS = 250;
 const SVG = "http://www.w3.org/2000/svg";
+// The hand, back to front: index finger, three folded fingers, then the palm with the thumb.
+const HAND = [
+  "M8 15 V4.2 a2.1 2.1 0 0 1 4.2 0 V15 Z",
+  "M12.2 15 V11.2 a2 2 0 0 1 4 0 V15 Z",
+  "M16.2 15 V12.4 a2 2 0 0 1 4 0 V15 Z",
+  "M20.2 15 V14 a1.9 1.9 0 0 1 3.8 0 V15 Z",
+  "M8 15.5 L4.6 12.6 a1.9 1.9 0 0 0 -2.7 2.7 L6.2 21.5 C7.4 25.2 9.6 26.6 13 26.6 H18 C22 26.6 24 24.4 24 20 V15 H8 Z",
+];
+// Where the fingertip sits inside the drawing, in pixels from its top left.
+const TIP_X = 9;
+const TIP_Y = 2;
 
 type Style = Record<string, string>;
 const apply = (el: HTMLElement | SVGElement, style: Style) => {
@@ -40,17 +51,23 @@ function install(): void {
     apply(edge, { position: "fixed", inset: "0", "pointer-events": "none", "box-sizing": "border-box",
       "box-shadow": `inset 0 0 0 3px ${YELLOW}, inset 0 0 16px rgba(245, 226, 122, 0.4)` });
 
+    // A small pointing hand: the tip of the index finger is the point the agent acts on.
     pointer = document.createElementNS(SVG, "svg");
-    pointer.setAttribute("width", "22");
+    pointer.setAttribute("width", "24");
     pointer.setAttribute("height", "26");
-    pointer.setAttribute("viewBox", "0 0 22 26");
-    const path = document.createElementNS(SVG, "path");
-    path.setAttribute("d", "M2 2 L2 21 L7 16.5 L10.5 24 L14 22.5 L10.7 15 L18 15 Z");
-    path.setAttribute("fill", YELLOW);
-    path.setAttribute("stroke", INK);
-    path.setAttribute("stroke-width", "1.5");
-    path.setAttribute("stroke-linejoin", "round");
-    pointer.append(path);
+    pointer.setAttribute("viewBox", "0 0 26 28");
+    const hand = document.createElementNS(SVG, "g");
+    hand.setAttribute("fill", YELLOW);
+    hand.setAttribute("stroke", INK);
+    hand.setAttribute("stroke-width", "1.3");
+    hand.setAttribute("stroke-linejoin", "round");
+    hand.setAttribute("stroke-linecap", "round");
+    for (const d of HAND) {
+      const part = document.createElementNS(SVG, "path");
+      part.setAttribute("d", d);
+      hand.append(part);
+    }
+    pointer.append(hand);
     apply(pointer, { position: "fixed", left: "0", top: "0", "pointer-events": "none", display: "none", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))" });
 
     ring = document.createElement("div");
@@ -90,7 +107,7 @@ function install(): void {
       pointer.style.setProperty("display", "block", "important");
       const move = reduced() || !moved ? "none" : `transform ${MOVE_MS}ms ease-out`;
       pointer.style.setProperty("transition", move, "important");
-      pointer.style.setProperty("transform", `translate(${x - 2}px, ${y - 2}px)`, "important");
+      pointer.style.setProperty("transform", `translate(${x - TIP_X}px, ${y - TIP_Y}px)`, "important");
       ring.style.setProperty("transform", `translate(${x}px, ${y}px)`, "important");
       moved = true;
       if (kind === "click" && !reduced()) {
@@ -115,7 +132,7 @@ function install(): void {
         visible: state.visible,
         attached: !!host?.isConnected,
         edgeWidth: edge ? Math.round(edge.getBoundingClientRect().width) : 0,
-        pointer: tip ? { x: Math.round(tip.left) + 2, y: Math.round(tip.top) + 2 } : null,
+        pointer: tip ? { x: Math.round(tip.left) + TIP_X, y: Math.round(tip.top) + TIP_Y } : null,
       };
     },
   };
