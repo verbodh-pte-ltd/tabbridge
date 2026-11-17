@@ -7,6 +7,7 @@ import net from "node:net";
 import { encodeLine, encodeNative, lineDecoder, nativeDecoder } from "./framing.ts";
 import { homeDir, logPath, MAX_BROWSERS, pipeAlive, pipePath, tokenPath, writeBrowser } from "./paths.ts";
 import { PROTOCOL_VERSION, textResult, type ExtensionToHost, type HostToExtension } from "./shared/protocol.ts";
+import { VERSION } from "./version.ts";
 
 interface HostOptions {
   input: NodeJS.ReadableStream;
@@ -19,8 +20,10 @@ export async function runHost({ input, output, log = fileLog }: HostOptions): Pr
   const token = crypto.randomBytes(32).toString("hex");
   let slot = 0;
   let label = "";
+  let extensionVersion: string | undefined;
   const register = () => {
-    if (slot) writeBrowser({ slot, label: label || `Chrome ${slot}`, pid: process.pid, started: new Date().toISOString() });
+    // The versions are for tabbridge doctor: the host's own, and the one the extension reported.
+    if (slot) writeBrowser({ slot, label: label || `Chrome ${slot}`, pid: process.pid, started: new Date().toISOString(), host: VERSION, ...(extensionVersion ? { extension: extensionVersion } : {}) });
   };
 
   let extensionReady = false;
@@ -35,6 +38,7 @@ export async function runHost({ input, output, log = fileLog }: HostOptions): Pr
       register();
     } else if (message.type === "ready") {
       extensionReady = true;
+      extensionVersion = message.version;
       label = message.label ?? label;
       register();
       log(`extension ready, version ${message.version}, browser "${label}"`);

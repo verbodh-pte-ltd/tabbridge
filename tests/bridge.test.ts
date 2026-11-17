@@ -45,6 +45,23 @@ async function startHost(opts: { ready?: boolean; reply?: (msg: any) => any } = 
   return { server, received, toHost, stop: () => { toHost.end(); server.close(); } };
 }
 
+test("the host registry records the host version and the extension version once the extension is ready", async () => {
+  const { home } = isolate();
+  const toHost = new PassThrough();
+  const server = await runHost({ input: toHost, output: new PassThrough(), log: () => {} });
+  try {
+    toHost.write(encodeNative({ type: "ready", version: "1.2.3", protocol: 1, label: "Work" }));
+    await new Promise((r) => setTimeout(r, 100));
+    const entry = JSON.parse(fs.readFileSync(path.join(home, "browsers.json"), "utf8"))[0];
+    assert.equal(entry.extension, "1.2.3");
+    assert.equal(entry.host, JSON.parse(fs.readFileSync(path.join(ROOT, "bridge", "package.json"), "utf8")).version);
+    assert.equal(entry.label, "Work");
+  } finally {
+    toHost.end();
+    server.close();
+  }
+});
+
 test("native frames survive being split across chunks", () => {
   const got: any[] = [];
   const feed = nativeDecoder((m) => got.push(m));
